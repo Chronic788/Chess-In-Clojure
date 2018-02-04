@@ -1,0 +1,66 @@
+
+
+FEN Notation
+------------
+FEN notation is a standard notation to describe a board position of a chess game.
+
+
+The FEN starting position:
+
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+
+The FEN String contains 6 fields with a space as a separator:
+
+1. Piece placement from White's perspective.
+
+   Ranks are described between the / characters with 8 being leftmost and decending to 1
+
+   White pieces are UPPER CASE
+   Black pieces are LOWER CASE
+   Empty squares are denoted numerically 1 to 8
+   / separates ranks
+   
+2. Active color:
+
+   w = White
+   b = Black
+
+3. Castling availability
+
+   - = neither side can castle
+   K = White can castle Kingside
+   W = White can castle Queenside
+   k = Black can castle Kingside
+   q = Black can castle Queenside
+
+4. En passant target square in algebraic notation
+
+   - = no target square
+   
+   If a pawn has just made a two square move, this is the square behind the Pawn
+   This is always recorded
+
+5. Halfmove clock : The number of halfmoves since the last capture
+
+   Used to determine a draw under the fifty move rule
+
+6. Full move number. The number of full moves made so far:
+
+   Incremented after Black's move
+
+
+Algebraic Notation
+------------------
+
+Files are alphabetic.
+Ranks are numberic.
+
+          a b c d e f g h
+        8
+        7
+        6
+        5
+        4
+        3       
+        2
+        1
