@@ -188,13 +188,19 @@
 ;;Define functions for working with the board in coordinate form
 ;;
 ;; Board positions will look like this:
-;;     {:coordinates {x: int y: int} :piece char}
 ;;
-;; Coordinates will start at the bottom left of the board at (0,0) and increment to 7 on both axes
+;;    {:piece piece-letter
+;;     :coordinates {:x x :y y}
+;;     :algebraic square :: eg. a1, b3, etc..
+;;     :color piece-color
+;;    }
+;;
+;; Coordinates will start at the bottom left of the board at (1,1) and increment to 8 on both axes
 ;;
 ;; Ultimately, the board is represented as a list of coordinate-piece tuples
 ;; ({tuple 1}, {tuple 2}, {tuple 3})
 ;;------------------------------------------------------------------------------------------
+
 
 (defn print-board-coordinate
   ;;Prints the board in its coordinate form
@@ -286,6 +292,17 @@
   [FEN]
   (get-from-FEN FEN :full-move-clock))
 
+(defn white-pieces
+  ;;Retrieves all of the white pieces on the board
+  [board]
+  (filter (fn [piece] (characters-equal? \w (get piece :color))) board))
+
+(defn black-pieces
+  ;;Retrieves all of the black pieces on the board
+  [board]
+  (filter (fn [piece] (characters-equal? \b (get piece :color))) board))
+
+
 ;;------------------------------------------------------------------------------------------
 ;;Board Alteration Functions
 ;;------------------------------------------------------------------------------------------
@@ -335,6 +352,52 @@
 ;;                             by both players
 ;;      - Threefold repetition: The same board position has occurred three times
 
+;;------------------------------------------------------------------------------------------
+;;Moving Functions
+;;------------------------------------------------------------------------------------------
 
-;;Add in the functionality to translate a board map back into a FEN string
+;;A move is a construct of the potential of a piece and will be defined as a map:
+;;
+;;  {:piece p :from {:x x :y y} :to {:x x :y y}}
 
+(defn out-of-bounds
+  ;;Determines if the given x,y coordinates are out of bounds.
+  ;;Coordinates are given as a map: {:x x :y y}
+  ;;Failing criteria are: x < 0 || x > 8 || y < 0 || y > 8
+  [coordinates]
+  (let [x (get coordinates :x) y (get coordinates :y)]
+    (or (< x 0) (> x 8) (< y 0) (> y 8))))
+
+(defn in-bounds
+  ;;Determines if the given x,y coordinates are in bounds.
+  ;;Coordinates are given as a map: {:x x :y y}.
+  [coordinates]
+  (not (out-of-bounds coordinates)))
+
+(defn moves
+  ;;Defines the abstract action that produces a move.
+  ;;For a given piece, we translate it in x,y terms by applying the additive terms
+  ;;which can be positively, negatively, or zero valued
+  [piece x-additive y-additive]
+  (assoc {} :x (+ (get piece :x) x-additive) :y (+ (get piece :y) y-additive)))
+
+;;--------------------
+;;Pawns
+;;--------------------
+
+(defn white-pawn-move
+  [pawn]
+  (moves pawn 1 0))
+
+(defn black-pawn-move
+  ;;Defines a black pawns move
+  [pawn]
+  (moves pawn -1 0))
+
+;;--------------------
+;;Kings
+;;--------------------
+
+;;I need to figure out how to define move functions that produce many possible moves
+;;I can use the moves function with the positions as integers but how do I end up
+;;with a collection of map items that are moves?
