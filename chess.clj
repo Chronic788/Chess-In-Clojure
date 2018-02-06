@@ -380,10 +380,33 @@
   [pawn]
   (moves pawn -1 0))
 
+;;DO ENPASSANT MOVES
+
 ;;--------------------
 ;;King
 
 (defn king-moves
   [king]
-  (map moves1 [[king 1 1] [king 1 2]]))
+  (map moves [[king 1 1] 
+              [king 1 0]
+              [king 0 1]
+              [king 0 -1]
+              [king -1 0]
+              [king -1 -1]
+              [king 1 -1]
+              [king -1 1]]))
+
+;;-------------------
+;;Knight
+
+(defn knight-moves
+  [knight]
+  (map moves [[knight -1 2]
+              [knight -2 1]
+              [knight -2 -1]
+              [knight -1 -2]
+              [knight 1 2]
+              [knight 2 1]
+              [knight 2 -1]
+              [knight 1 -2]]))
 
