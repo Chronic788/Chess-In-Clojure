@@ -64,13 +64,83 @@
     \w
     \b)))
 
-;;Define functions to work with the board in FEN String form
 ;;-------------------------------------------------------------------------------------------
+;;Define functions for working with the board in coordinate form
+;;
+;; Board positions will look like this:
+;;
+;;    {:piece piece-letter
+;;     :coordinates {:x x :y y}
+;;     :algebraic square :: eg. a1, b3, etc..
+;;     :color piece-color
+;;    }
+;;
+;; Coordinates will start at the bottom left of the board at (1,1) and increment to 8 on both axes
+;;
+;; Ultimately, the board is represented as a list of coordinate-piece tuples
+;; ({tuple 1}, {tuple 2}, {tuple 3})
+;;------------------------------------------------------------------------------------------
+
+
+(defn print-board-coordinate
+  ;;Prints the board in its coordinate form
+  [board]
+  (if (not-empty board)
+    (let [piece-entry (first board)]
+       (let [coordinates (get piece-entry :coordinates)
+             piece (get piece-entry :piece)
+             alpha (get piece-entry :algebraic)
+             color (get piece-entry :color)]
+         (println (str ":" piece " - (" (get coordinates :x) "," (get coordinates :y) ") - :" alpha " :" color))
+         (recur (rest board))))
+    (println)))
+
+(defn process-rank
+  [rank rankNumber file board]
+  (let [piece (first rank)
+        entry (assoc {} 
+                :piece piece
+                :coordinates (assoc {} :x rankNumber :y file)    
+                :algebraic (str (file-to-alpha file) rankNumber)
+                :color (pieceColor piece))]
+    (if (not-empty (rest rank))
+      (recur (rest rank) rankNumber (inc file) (conj board entry))
+      (conj board entry))))
+
+(defn compose-board
+  [ranks rankNumber board]
+  (let [rank (first ranks) file 1]
+    (if (not-empty (rest ranks))
+      (recur (rest ranks) (inc rankNumber) (process-rank rank rankNumber file board))
+      (process-rank rank rankNumber file board))))
 
 (defn get-FEN-ranks
   ;;Get the ranks from the FEN String
   [FEN]
   (str/split (first (str/split FEN #" "))  #"/"))
+
+(defn dotify
+  ;;In the given String, replaces digits with the same number of '.' characters for use with
+  ;;traditional board formats
+  [FEN]
+  (apply str
+         (mapcat (fn [c]
+                   (if (Character/isDigit c)
+                     (repeat (Integer/parseInt (str c)) \.)
+                     [c]))
+                 FEN)))
+
+(defn board-from-FEN
+  ;;Builds a coordinate board from a FEN string
+  [FEN]
+  (let [ranks (get-FEN-ranks (dotify FEN))]
+    (compose-board ranks 1 '())))
+
+;;-------------------------------------------------------------------------------------------
+;;Define functions to work with the board in FEN String form
+;;-------------------------------------------------------------------------------------------
+
+
 
 (defn print-rank
   ;;Prints the given rank's pieces
@@ -99,35 +169,7 @@
   (println))
 
 
-(defn dotify
-  ;;In the given String, replaces digits with the same number of '.' characters for use with
-  ;;traditional board formats
-  [FEN]
-  (apply str
-         (mapcat (fn [c]
-                   (if (Character/isDigit c)
-                     (repeat (Integer/parseInt (str c)) \.)
-                     [c]))
-                 FEN)))
 
-;;A full board is guaranteed to have 64 entries
-;;splitting them by 8 will give me the pieces in each rank
-;;then the task is to convert the pieces that are .s in the rank
-;;to a consolidated number
-
-
-;;ab..as.sadf.
-
-;;go through the elements one by one
-;;if not a dot, append to new list
-;;if we hit a dot, count them
-;;and append the number of dots to new list
-;;afterwards,disregard dots.
-;;when you hit a non dot, set to re regard dots
-
-;;we want to end up with a list of string reps of the ranks in the board 
-;;first we get the ranks with ranks from board
-;;next we turn each into a string with FENify
 
 (defn ranks-from-board
   ;;Splits the 64 spaces into ranks of 8
@@ -184,61 +226,6 @@
   (str/join "/" (rankify-board board)))
 
 (FENify-ranks (board-from-FEN FEN))
-
-;;Define functions for working with the board in coordinate form
-;;
-;; Board positions will look like this:
-;;
-;;    {:piece piece-letter
-;;     :coordinates {:x x :y y}
-;;     :algebraic square :: eg. a1, b3, etc..
-;;     :color piece-color
-;;    }
-;;
-;; Coordinates will start at the bottom left of the board at (1,1) and increment to 8 on both axes
-;;
-;; Ultimately, the board is represented as a list of coordinate-piece tuples
-;; ({tuple 1}, {tuple 2}, {tuple 3})
-;;------------------------------------------------------------------------------------------
-
-
-(defn print-board-coordinate
-  ;;Prints the board in its coordinate form
-  [board]
-  (if (not-empty board)
-    (let [piece-entry (first board)]
-       (let [coordinates (get piece-entry :coordinates)
-             piece (get piece-entry :piece)
-             alpha (get piece-entry :algebraic)
-             color (get piece-entry :color)]
-         (println (str ":" piece " - (" (get coordinates :x) "," (get coordinates :y) ") - :" alpha " :" color))
-         (recur (rest board))))
-    (println)))
-
-(defn process-rank
-  [rank rankNumber file board]
-  (let [piece (first rank)
-        entry (assoc {} 
-                :piece piece
-                :coordinates (assoc {} :x rankNumber :y file)    
-                :algebraic (str (file-to-alpha file) rankNumber)
-                :color (pieceColor piece))]
-    (if (not-empty (rest rank))
-      (recur (rest rank) rankNumber (inc file) (conj board entry))
-      (conj board entry))))
-
-(defn compose-board
-  [ranks rankNumber board]
-  (let [rank (first ranks) file 1]
-    (if (not-empty (rest ranks))
-      (recur (rest ranks) (inc rankNumber) (process-rank rank rankNumber file board))
-      (process-rank rank rankNumber file board))))
-
-(defn board-from-FEN
-  ;;Builds a coordinate board from a FEN string
-  [FEN]
-  (let [ranks (get-FEN-ranks (dotify FEN))]
-    (compose-board ranks 1 '())))
 
 ;;------------------------------------------------------------------------------------------
 ;;Board Access Helper Functions
@@ -378,12 +365,11 @@
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
   ;;which can be positively, negatively, or zero valued
-  [piece x-additive y-additive]
+  [[piece x-additive y-additive]]
   (assoc {} :x (+ (get piece :x) x-additive) :y (+ (get piece :y) y-additive)))
 
 ;;--------------------
 ;;Pawns
-;;--------------------
 
 (defn white-pawn-move
   [pawn]
@@ -395,9 +381,9 @@
   (moves pawn -1 0))
 
 ;;--------------------
-;;Kings
-;;--------------------
+;;King
 
-;;I need to figure out how to define move functions that produce many possible moves
-;;I can use the moves function with the positions as integers but how do I end up
-;;with a collection of map items that are moves?
+(defn king-moves
+  [king]
+  (map moves1 [[king 1 1] [king 1 2]]))
+
