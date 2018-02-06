@@ -348,37 +348,49 @@
 ;;  {:piece p :from {:x x :y y} :to {:x x :y y}}
 
 (defn out-of-bounds
-  ;;Determines if the given x,y coordinates are out of bounds.
-  ;;Coordinates are given as a map: {:x x :y y}
+  ;;Determines if the given piece is out of bounds.
   ;;Failing criteria are: x < 0 || x > 8 || y < 0 || y > 8
-  [coordinates]
-  (let [x (get coordinates :x) y (get coordinates :y)]
+  [piece]
+  (let [coordinates (get piece :coordinates) x (get coordinates :x) y (get coordinates :y)]
     (or (< x 0) (> x 8) (< y 0) (> y 8))))
 
 (defn in-bounds
-  ;;Determines if the given x,y coordinates are in bounds.
-  ;;Coordinates are given as a map: {:x x :y y}.
+  ;;Determines if the given piece is in bounds.
   [coordinates]
   (not (out-of-bounds coordinates)))
 
-(defn moves
+(defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
   ;;which can be positively, negatively, or zero valued
   [[piece x-additive y-additive]]
-  (assoc {} :x (+ (get piece :x) x-additive) :y (+ (get piece :y) y-additive)))
+  (let [current-coordinates (get piece :coordinates)]
+    (assoc piece :coordinates (assoc {} :x (+ (get current-coordinates :x) x-additive) 
+                                        :y (+ (get current-coordinates :y) y-additive)))))
+
+(defn valid-moves
+  ;;Determines if the given moves are valid.
+  ;;Valid moves are:
+  ;;    1. In bounds
+  ;;    2. On a blank space 
+  ;;    3. On another player's piece
+  [moves]
+  (filter in-bounds moves)
+  
+  ;;Implement filters on #2 and #3
+  )
 
 ;;--------------------
 ;;Pawns
 
 (defn white-pawn-move
   [pawn]
-  (moves pawn 1 0))
+  (define-move pawn 1 0))
 
 (defn black-pawn-move
   ;;Defines a black pawns move
   [pawn]
-  (moves pawn -1 0))
+  (define-move pawn -1 0))
 
 ;;DO ENPASSANT MOVES
 
@@ -387,26 +399,32 @@
 
 (defn king-moves
   [king]
-  (filter in-bounds (map moves [[king 1 1] 
-                                [king 1 0]
-                                [king 0 1]
-                                [king 0 -1]
-                                [king -1 0]
-                                [king -1 -1]
-                                [king 1 -1]
-                                [king -1 1]])))
+  (filter valid-moves (map define-move [[king 1 1] 
+                                        [king 1 0]
+                                        [king 0 1]
+                                        [king 0 -1]
+                                        [king -1 0]
+                                        [king -1 -1]
+                                        [king 1 -1]
+                                        [king -1 1]])))
 
 ;;-------------------
 ;;Knight
 
 (defn knight-moves
   [knight]
-  (filter in-bounds (map moves [[knight -1 2]
-                                [knight -2 1]
-                                [knight -2 -1]
-                                [knight -1 -2]
-                                [knight 1 2]
-                                [knight 2 1]
-                                [knight 2 -1]
-                                [knight 1 -2]])))
+  (filter valid-moves (map define-move [[knight -1 2]
+                                        [knight -2 1]
+                                        [knight -2 -1]
+                                        [knight -1 -2]
+                                        [knight 1 2]
+                                        [knight 2 1]
+                                        [knight 2 -1]
+                                        [knight 1 -2]])))
 
+;;I dont need to filter out valid moves on every piece type.
+;;What I should do instead is filter in the function I create
+;;to compile all the moves
+
+;;Im still thinking I should go with a map from piece letter to function
+;;either in a function or define a map
