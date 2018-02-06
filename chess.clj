@@ -399,32 +399,29 @@
 
 (defn king-moves
   [king]
-  (filter valid-moves (map define-move [[king 1 1] 
-                                        [king 1 0]
-                                        [king 0 1]
-                                        [king 0 -1]
-                                        [king -1 0]
-                                        [king -1 -1]
-                                        [king 1 -1]
-                                        [king -1 1]])))
+  (map define-move [[king 1 1] 
+                    [king 1 0]
+                    [king 0 1]
+                    [king 0 -1]
+                    [king -1 0]
+                    [king -1 -1]
+                    [king 1 -1]
+                    [king -1 1]]))
 
 ;;-------------------
 ;;Knight
 
 (defn knight-moves
   [knight]
-  (filter valid-moves (map define-move [[knight -1 2]
-                                        [knight -2 1]
-                                        [knight -2 -1]
-                                        [knight -1 -2]
-                                        [knight 1 2]
-                                        [knight 2 1]
-                                        [knight 2 -1]
-                                        [knight 1 -2]])))
+  (map define-move [[knight -1 2]
+                    [knight -2 1]
+                    [knight -2 -1]
+                    [knight -1 -2]
+                    [knight 1 2]
+                    [knight 2 1]
+                    [knight 2 -1]
+                    [knight 1 -2]]))
 
-;;I dont need to filter out valid moves on every piece type.
-;;What I should do instead is filter in the function I create
-;;to compile all the moves
 
 ;;Im still thinking I should go with a map from piece letter to function
 ;;either in a function or define a map
