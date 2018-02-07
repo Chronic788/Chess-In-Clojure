@@ -169,8 +169,6 @@
   (println))
 
 
-
-
 (defn ranks-from-board
   ;;Splits the 64 spaces into ranks of 8
   [board ranks]
@@ -343,6 +341,9 @@
 ;;Moving Functions
 ;;------------------------------------------------------------------------------------------
 
+(def test-piece
+  (first (board-from-FEN FEN)))
+
 ;;A move is a construct of the potential of a piece and will be defined as a map:
 ;;
 ;;  {:piece p :from {:x x :y y} :to {:x x :y y}}
@@ -409,7 +410,7 @@
                     [king -1 1]]))
 
 ;;-------------------
-;;Knight
+;;Knights
 
 (defn knight-moves
   [knight]
@@ -422,6 +423,51 @@
                     [knight 2 -1]
                     [knight 1 -2]]))
 
+;;------------------
+;;Castles
+
+
+(defn castle-moves
+  ([castle]
+   (concat (castle-moves castle \N 8 '())
+           (castle-moves castle \S 8 '())
+           (castle-moves castle \E 8 '())
+           (castle-moves castle \W 8 '())))
+  ([castle direction times moves]
+   (if (< 0 times)
+     (cond 
+      (characters-equal? \N direction) (let [move (define-move [castle 0 1])]
+                                         (castle-moves move direction (dec times) (cons move moves)))
+      (characters-equal? \S direction) (let [move (define-move [castle 0 -1])]
+                                         (castle-moves move direction (dec times) (cons move moves)))
+      (characters-equal? \E direction) (let [move (define-move [castle 1 0])]
+                                         (castle-moves move direction (dec times) (cons move moves)))
+      (characters-equal? \W direction) (let [move (define-move [castle -1 0])]
+                                         (castle-moves move direction (dec times) (cons move moves)))
+      ) moves)))
+
+;;------------------
+;;Bishops
+
+(castle-moves test-piece)
+;;------------------
+;;Queens
+
+;;(reduce cons '() [(+ 1 1)])
+
+(count (castle-moves test-piece))
 
 ;;Im still thinking I should go with a map from piece letter to function
 ;;either in a function or define a map
+
+
+;;The remaining functions have special limitations and concerns.
+;;For one, their movement is tiled. My plan is to implement recursive functions
+;;with an accumulator.
+;;Another limitation is that while their movement is tiled, they can not move through
+;;pieces of the same color on the board.
+;;This gives me an interesting idea. I could filter the board by directionality:
+;;  Verically, Horizontally, and diagonally in both directions. I would essentially
+;;be taking cross sections of the board.
+;;However, it may be simpler to pass the board along into the recursive function to
+;;continually test for same color piece presence on each axis.
