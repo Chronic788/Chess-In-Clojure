@@ -360,6 +360,31 @@
   [coordinates]
   (not (out-of-bounds coordinates)))
 
+(defn landing-on-same-color
+  ;;Search through the board for a piece that occupies the potential move's landing spot
+  ;;If we find one, then test to see if it is the same color, returning the result.
+  ;;If we process the entire board nil is returned which is falsey and thus correct for
+  ;;the intent of this function.
+  ;;Note that the piece passed in is a 'potential' piece
+  [potential-peice board]
+  (if (not-empty board)
+      (let [test-piece (first board)
+            test-coordinates (get test-piece :coordinates) 
+            test-x (get test-coordinates :x) 
+            test-y (get test-coordinates :y)
+            test-color (get test-piece :color)
+
+            this-coordinates (get potential-piece :coordinates)
+            this-x (get this-coordinates :x)
+            this-y (get this-coordinates :y)
+            this-color (get potential-piece :color)]
+
+        (if (and (= test-x this-x) (= test-y this-y))
+          (let [same-color (characters-equal? this-color test-color)]
+            (if (not same-color)
+              (recur potential-piece (rest board))
+              same-color))))))
+
 (defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
@@ -449,25 +474,13 @@
 ;;------------------
 ;;Bishops
 
-(castle-moves test-piece)
+
 ;;------------------
 ;;Queens
 
 ;;(reduce cons '() [(+ 1 1)])
 
-(count (castle-moves test-piece))
 
-;;Im still thinking I should go with a map from piece letter to function
-;;either in a function or define a map
-
-
-;;The remaining functions have special limitations and concerns.
-;;For one, their movement is tiled. My plan is to implement recursive functions
-;;with an accumulator.
-;;Another limitation is that while their movement is tiled, they can not move through
-;;pieces of the same color on the board.
-;;This gives me an interesting idea. I could filter the board by directionality:
-;;  Verically, Horizontally, and diagonally in both directions. I would essentially
-;;be taking cross sections of the board.
-;;However, it may be simpler to pass the board along into the recursive function to
-;;continually test for same color piece presence on each axis.
+;;Low hanging fruit:
+;;Landing on piece of same color.
+;;I need a piece potential, and the board. Look up the space on the board and check color.
