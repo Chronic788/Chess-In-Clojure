@@ -366,7 +366,7 @@
   ;;If we process the entire board nil is returned which is falsey and thus correct for
   ;;the intent of this function.
   ;;Note that the piece passed in is a 'potential' piece
-  [potential-peice board]
+  [potential-piece board]
   (if (not-empty board)
       (let [test-piece (first board)
             test-coordinates (get test-piece :coordinates) 
@@ -388,7 +388,7 @@
 (defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
-  ;;which can be positively, negatively, or zero valued
+  ;;which can be positively, negatively, or zero valued.
   [[piece x-additive y-additive]]
   (let [current-coordinates (get piece :coordinates)]
     (assoc piece :coordinates (assoc {} :x (+ (get current-coordinates :x) x-additive) 
@@ -409,14 +409,28 @@
 ;;--------------------
 ;;Pawns
 
-(defn white-pawn-move
+(defn white-pawn-moves
+  ;;Defines the moving behavior of white pawns
   [pawn]
-  (define-move pawn 1 0))
+  (let [coordinates (get pawn :coordinates) 
+        y (get coordinates :y)]
+    (if (= 2 y)
+      (conj '() 
+            (define-move [pawn 1 0]) 
+            (define-move [pawn 2 0])) 
+      (define-move [pawn 1 0]))))
 
-(defn black-pawn-move
-  ;;Defines a black pawns move
+(defn black-pawn-moves
+  ;;Defines the moving behavior of white pawns
   [pawn]
-  (define-move pawn -1 0))
+  (let [coordinates (get pawn :coordinates) 
+        y (get coordinates :y)]
+    (if (= 7 y)
+      (conj '() 
+            (define-move [pawn -1 0]) 
+            (define-move [pawn -2 0])) 
+      (define-move [pawn -1 0]))))
+
 
 ;;DO ENPASSANT MOVES
 
