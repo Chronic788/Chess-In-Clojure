@@ -140,8 +140,6 @@
 ;;Define functions to work with the board in FEN String form
 ;;-------------------------------------------------------------------------------------------
 
-
-
 (defn print-rank
   ;;Prints the given rank's pieces
   [pieces]
@@ -167,7 +165,6 @@
   (print-ranks (get-FEN-ranks FEN))
   (println)
   (println))
-
 
 (defn ranks-from-board
   ;;Splits the 64 spaces into ranks of 8
@@ -360,15 +357,14 @@
   [coordinates]
   (not (out-of-bounds coordinates)))
 
-(defn landing-on-same-color
-  ;;Search through the board for a piece that occupies the potential move's landing spot
-  ;;If we find one, then test to see if it is the same color, returning the result.
-  ;;If we process the entire board nil is returned which is falsey and thus correct for
-  ;;the intent of this function.
-  ;;Note that the piece passed in is a 'potential' piece
+(defn get-space-on-board
+  ;;Returns the space on the board that the potiential move is targeting.
+  ;;Due to the way movements are structured, the potential move may possibly be off of
+  ;;the board so nil must be accounted for in calling functions!
   [potential-piece board]
   (if (not-empty board)
       (let [test-piece (first board)
+
             test-coordinates (get test-piece :coordinates) 
             test-x (get test-coordinates :x) 
             test-y (get test-coordinates :y)
@@ -380,11 +376,25 @@
             this-color (get potential-piece :color)]
 
         (if (and (= test-x this-x) (= test-y this-y))
-          (let [same-color (characters-equal? this-color test-color)]
-            (if (not same-color)
-              (recur potential-piece (rest board))
-              same-color))))))
+          test-piece
+          (recur potential-piece (rest board))))))  
 
+(defn landing-on-same-color
+  ;;Determines if a potiential piece's move will land it on the same color piece
+  [potential-piece board]
+  (let [space-on-board (get-space-on-board potential-piece board)]
+    (if space-on-board
+      (let [board-color (get space-on-board :color)
+            moving-piece-color (get potential-piece :color)]
+        (characters-equal? moving-piece-color board-color)))))
+
+
+(defn landing-on-space
+  ;;Determines if a potential piece's move will land on a space
+  [potential-piece board]
+  (let [space-on-board (get-space-on-board potential-piece board)]
+    (if space-on-board
+      (characters-equal? \. (get space-on-board :piece)))))
 (defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
