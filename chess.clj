@@ -12,8 +12,6 @@
                   :half-move-clock 4
                   :full-move-clock 5})
 
-
-
 ;;Helper Functions
 ;;------------------------------------------------------------------------------------------
 
@@ -27,6 +25,11 @@
   ;;Casts a String representation of a integer to an int :: "1" -> 1
   [i]
   (read-string i))
+
+(defn toLowerCase
+  ;;Converts a given Character literal to lower case
+  [c]
+  (str/lower-case (str c)))
 
 (defn lower-case?
   [c]
@@ -43,6 +46,11 @@
   ;;Determines if the two characters passed in are the same
   [x y]
   (= (str x) (str y)))
+
+(defn strings-equal?
+  ;;Determines if the two Strings passed in are the same
+  [x y]
+  (= x y))
 
 ;;Game Helper Functions
 ;;------------------------------------------------------------------------------------------
@@ -354,8 +362,8 @@
 
 (defn in-bounds
   ;;Determines if the given piece is in bounds.
-  [coordinates]
-  (not (out-of-bounds coordinates)))
+  [piece]
+  (not (out-of-bounds piece)))
 
 (defn get-space-on-board
   ;;Returns the space on the board that the potiential move is targeting.
@@ -380,7 +388,7 @@
           (recur potential-piece (rest board))))))  
 
 (defn landing-on-same-color
-  ;;Determines if a potiential piece's move will land it on the same color piece
+  ;;Determines if a potential piece's move will land it on the same color piece
   [potential-piece board]
   (let [space-on-board (get-space-on-board potential-piece board)]
     (if space-on-board
@@ -389,12 +397,23 @@
         (characters-equal? moving-piece-color board-color)))))
 
 
+(defn landing-on-opposite-color
+  ;;Determines if a potential piece's move will land it on a piece of the opposite color
+  [potential-piece board]
+  (let [space-on-board (get-space-on-board potential-piece board)]
+    (if space-on-board
+      (let [board-color (get space-on-board :color)
+            moving-piece-color (get potential-piece :color)]
+        (not (characters-equal? moving-piece-color board-color))))))
+
+
 (defn landing-on-space
   ;;Determines if a potential piece's move will land on a space
   [potential-piece board]
   (let [space-on-board (get-space-on-board potential-piece board)]
     (if space-on-board
       (characters-equal? \. (get space-on-board :piece)))))
+
 (defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
@@ -472,39 +491,111 @@
                     [knight 2 -1]
                     [knight 1 -2]]))
 
+;;----------------------------------------------------------
+;;Tiled pieces:
+;;
+;;    Tiled Piece: A tiled piece is a piece that can move in some direction(s) for
+;;                 for as far as the player would like to move it. I define that
+;;                 behavior as the repeated action of moving that piece one space
+;;                 in that direction for a maximum of eight spaces in light of the fact
+;;                 that a chess board is 8x8 spaces.
+;;
+;;    Thus, the tiled movement of these peices have special stopping conditions:
+;;        - The tiling of a piece will stop if:
+;;          1. The piece runs off of the board
+;;          2. The piece lands on a piece of its own color
+;;          3. The piece lands on a piece of the opposite color
+;;
+;;        - To address these behaviors, the following rules are implemented:
+;;          1. I let the piece run off of the board. I filter out these out-of-bounds moves
+;;             at a higher level to save code.
+;;          2. If the piece lands on a piece of its own color, recursion will stop WITHOUT adding
+;;             that piece to the move accumulator.
+;;          3. If the piece lands on a piece of the opposite color, recursion will stop WITH adding
+;;             that piece to the move accumulator.
+;;
+;;         Pieces that tile are the Queen, the castles, and the bishops
+;;
+;;----------------------------------------------------------
+
+
+(defn tile
+  [moved-piece board direction times moves]
+  (let [piece-type (toLowerCase (get moved-piece :piece))]
+    (cond
+     (characters-equal? \r piece-type) (if (landing-on-same-color moved-piece board)
+                                         (castle-moves moved-piece board direction 0 moves)
+                                         (if (landing-on-opposite-color moved-piece board)
+                                           (castle-moves moved-piece board direction 0 (cons moved-piece moves))
+                                           (castle-moves moved-piece board direction (dec times) (cons moved-piece moves))))
+
+     (characters-equal? \q piece-type) (if (landing-on-same-color moved-piece board)
+                                         (queens-moves moved-piece board direction 0 moves)
+                                         (if (landing-on-opposite-color moved-piece board)
+                                           (queens-moves moved-piece board direction 0 (cons moved-piece moves))
+                                           (queens-moves moved-piece board direction (dec times) (cons moved-piece moves))))
+
+     (characters-equal? \b piece-type) (if (landing-on-same-color moved-piece board)
+                                         (bishop-moves moved-piece board direction 0 moves)
+                                         (if (landing-on-opposite-color moved-piece board)
+                                           (bishop-moves moved-piece board direction 0 (cons moved-piece moves))
+                                           (bishop-moves moved-piece board direction (dec times) (cons moved-piece moves))))))
+
 ;;------------------
 ;;Castles
 
 
 (defn castle-moves
-  ([castle]
+  ;;Generates the potential moves a given castle can make on the board.
+  ([castle board]
    (concat (castle-moves castle \N 8 '())
            (castle-moves castle \S 8 '())
            (castle-moves castle \E 8 '())
            (castle-moves castle \W 8 '())))
-  ([castle direction times moves]
+  ([castle board direction times moves]
    (if (< 0 times)
      (cond 
       (characters-equal? \N direction) (let [move (define-move [castle 0 1])]
-                                         (castle-moves move direction (dec times) (cons move moves)))
+                                         (tile move board direction times moves))
       (characters-equal? \S direction) (let [move (define-move [castle 0 -1])]
-                                         (castle-moves move direction (dec times) (cons move moves)))
+                                         (tile move board direction times moves))
       (characters-equal? \E direction) (let [move (define-move [castle 1 0])]
-                                         (castle-moves move direction (dec times) (cons move moves)))
+                                         (tile move board direction times moves))
       (characters-equal? \W direction) (let [move (define-move [castle -1 0])]
-                                         (castle-moves move direction (dec times) (cons move moves)))
+                                         (tile move board direction times moves))
       ) moves)))
 
 ;;------------------
 ;;Bishops
 
+(defn bishop-moves
+  ;;Generates the potential moves a given bishop can make on the board.
+  ([bishop board]
+   (concat (bishop-moves bishop "NW" 8 '())
+           (bishop-moves bishop "NE" 8 '())
+           (bishop-moves bishop "SE" 8 '())
+           (bishop-moves bishop "SW" 8 '())))
+  ([bishop board direction times moves]
+   (if (< 0 times)
+     (cond
+      (strings-equal? "NW" direction) (let [move (define-move [bishop -1 1])]
+                                        (tile move board direction times moves))
+      (strings-equal? "NE" direction) (let [move (define-move [bishop 1 1])]
+                                        (tile move board direction times moves))
+      (strings-equal? "SE" direction) (let [move (define-move [bishop 1 -1])]
+                                        (tile move board direction times moves))
+      (strings-equal? "SW" direction) (let [move (define-move [bishop -1 -1])]
+                                        (tile move board direction times moves))
+      ) moves)))
 
 ;;------------------
 ;;Queens
 
-;;(reduce cons '() [(+ 1 1)])
+(defn queens-moves
+  ;;Generates the potential moves a given queen can make on the board. Defined in
+  ;;terms of a bishop and a castle, we have all the moves! WOOO Functional Programming!
+  [queen board]
+  (concat (castle-moves queen board) 
+          (bishop-moves queen board)))
 
 
-;;Low hanging fruit:
-;;Landing on piece of same color.
-;;I need a piece potential, and the board. Look up the space on the board and check color.
