@@ -349,10 +349,6 @@
 (def test-piece
   (first (board-from-FEN FEN)))
 
-;;A move is a construct of the potential of a piece and will be defined as a map:
-;;
-;;  {:piece p :from {:x x :y y} :to {:x x :y y}}
-
 (defn out-of-bounds
   ;;Determines if the given piece is out of bounds.
   ;;Failing criteria are: x < 0 || x > 8 || y < 0 || y > 8
@@ -602,8 +598,15 @@
        (recur (rest moves) board (cons move valid-moves))
        (recur (rest moves) board valid-moves))))))
 
+;;--------------------------------------------------------------------------------
+;;A move is a construct of the potential of a piece and will be defined as a map:
+;;
+;;  {:from piece :to moves}
+;;
+;;  where piece is the piece on the current board and moves is the set of potential move for that piece
+
 (defn all-available-moves
-  ;;Compiles a list of all available moves to the given player on the given board
+  ;;Compiles a list of all moves available to the given player on the given board
   ([board color]
    (all-available-moves board color '()))
   ([board color moves]
@@ -613,24 +616,31 @@
          (cond
           (characters-equal? \p piece-type) 
               (if (characters-equal? \w piece-color)
-                (recur (rest board) color (concat moves (white-pawn-moves piece)))
-                (recur (rest board) color (concat moves (black-pawn-moves piece))))
+                (recur (rest board) color (conj moves (assoc {} :piece piece :moves (white-pawn-moves piece))))
+                (recur (rest board) color (conj moves (assoc {} :piece piece :moves (black-pawn-moves piece)))))
           (characters-equal? \r piece-type) 
-              (recur (rest board) color (concat moves (valid-moves (castle-moves piece board) board)))
+              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (castle-moves piece board) board))))
           (characters-equal? \b piece-type) 
-              (recur (rest board) color (concat moves (valid-moves (bishop-moves piece board) board)))
+              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (bishop-moves piece board) board))))
           (characters-equal? \q piece-type)
-              (recur (rest board) color (concat moves (valid-moves (queens-moves piece board) board)))
+              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (queens-moves piece board) board))))
           (characters-equal? \k piece-type) 
-              (recur (rest board) color (concat moves (valid-moves (king-moves piece) board)))
+              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (king-moves piece) board))))
           (characters-equal? \n piece-type)
-              (recur (rest board color (concat moves (valid-moves (knight-moves piece) board))))))
+              (recur (rest board color (conj moves (assoc {} :piece piece :moves (valid-moves (knight-moves piece) board)))))))
        (recur (rest board) color moves)))))
 
 
 ;;------------------------------------------------------------------------------------------
-;;Board Alteration Functions
+;; Game Play
 ;;------------------------------------------------------------------------------------------
+
+
+;;Implemented the concept of a move set for a piece
+
+;;Start by making a function to move a set of move, or actually alter the board to reflect a move change
+
+
 
 
 ;;Left:
