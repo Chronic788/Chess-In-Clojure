@@ -423,18 +423,6 @@
     (assoc piece :coordinates (assoc {} :x (+ (get current-coordinates :x) x-additive) 
                                         :y (+ (get current-coordinates :y) y-additive)))))
 
-(defn valid-moves
-  ;;Determines if the given moves are valid.
-  ;;Valid moves are:
-  ;;    1. In bounds
-  ;;    2. On a blank space 
-  ;;    3. On another player's piece
-  [moves]
-  (filter in-bounds moves)
-  
-  ;;Implement filters on #2 and #3
-  )
-
 ;;--------------------
 ;;Pawns
 
@@ -447,7 +435,7 @@
       (conj '() 
             (define-move [pawn 1 0]) 
             (define-move [pawn 2 0])) 
-      (define-move [pawn 1 0]))))
+      (conj '() (define-move [pawn 1 0])))))
 
 (defn black-pawn-moves
   ;;Defines the moving behavior of white pawns
@@ -458,10 +446,10 @@
       (conj '() 
             (define-move [pawn -1 0]) 
             (define-move [pawn -2 0])) 
-      (define-move [pawn -1 0]))))
+      (conj '() (define-move [pawn -1 0])))))
 
 
-;;DO ENPASSANT MOVES
+;;DO ENPASSANT AND PAWN CAPTURING MOVES
 
 ;;--------------------
 ;;King
@@ -520,6 +508,7 @@
 
 
 (defn tile
+  ;;Conditionally tiles a piece along the given direction
   [moved-piece board direction times moves]
   (let [piece-type (toLowerCase (get moved-piece :piece))]
     (cond
@@ -539,7 +528,7 @@
                                          (bishop-moves moved-piece board direction 0 moves)
                                          (if (landing-on-opposite-color moved-piece board)
                                            (bishop-moves moved-piece board direction 0 (cons moved-piece moves))
-                                           (bishop-moves moved-piece board direction (dec times) (cons moved-piece moves))))))
+                                           (bishop-moves moved-piece board direction (dec times) (cons moved-piece moves)))))))
 
 ;;------------------
 ;;Castles
@@ -598,4 +587,58 @@
   (concat (castle-moves queen board) 
           (bishop-moves queen board)))
 
+;;------------------
+;;All Moves
 
+(defn valid-moves
+  ;;Filters out invalid moves:
+  ;; 1. Landing out of bounds
+  ;; 2. Landing on a piece of the same color
+  ([moves board]
+   (valid-moves moves board '())
+  ([moves board valid-moves]
+   (let [move (first moves)]
+     (if (and (in-bounds move) (not (landing-on-same-color move board)))
+       (recur (rest moves) board (cons move valid-moves))
+       (recur (rest moves) board valid-moves))))))
+
+(defn all-available-moves
+  ;;Compiles a list of all available moves to the given player on the given board
+  ([board color]
+   (all-available-moves board color '()))
+  ([board color moves]
+   (let [piece (first board) piece-color (get piece :color)]
+     (if (characters-equal? color piece-color)
+       (let [piece-type (toLowerCase (get piece :piece))]
+         (cond
+          (characters-equal? \p piece-type) 
+              (if (characters-equal? \w piece-color)
+                (recur (rest board) color (concat moves (white-pawn-moves piece)))
+                (recur (rest board) color (concat moves (black-pawn-moves piece))))
+          (characters-equal? \r piece-type) 
+              (recur (rest board) color (concat moves (valid-moves (castle-moves piece board) board)))
+          (characters-equal? \b piece-type) 
+              (recur (rest board) color (concat moves (valid-moves (bishop-moves piece board) board)))
+          (characters-equal? \q piece-type)
+              (recur (rest board) color (concat moves (valid-moves (queens-moves piece board) board)))
+          (characters-equal? \k piece-type) 
+              (recur (rest board) color (concat moves (valid-moves (king-moves piece) board)))
+          (characters-equal? \n piece-type)
+              (recur (rest board color (concat moves (valid-moves (knight-moves piece) board))))))
+       (recur (rest board) color moves)))))
+
+
+;;------------------------------------------------------------------------------------------
+;;Board Alteration Functions
+;;------------------------------------------------------------------------------------------
+
+
+;;Left:
+;;
+;;    -Pawn Capturing Behavior
+;;    -En Passant
+;;    -Castling Moves
+;;    -Scoring
+;;    -Alpha Beta Minimax
+;;    -Random Moving
+;;    -API with Chess.js
