@@ -81,6 +81,7 @@
 ;;     :coordinates {:x x :y y}
 ;;     :algebraic square :: eg. a1, b3, etc..
 ;;     :color piece-color
+;;     :score - A number calculated if the piece is a potential move
 ;;    }
 ;;
 ;; Coordinates will start at the bottom left of the board at (1,1) and increment to 8 on both axes
@@ -291,6 +292,48 @@
   ;;Retrieves all of the black pieces on the board
   [board]
   (filter (fn [piece] (characters-equal? \b (get piece :color))) board))
+
+(defn piece-of-color
+  ;;Retrieves the pieces on the board of a given color
+  [board color]
+  (if (characters-equal? \w color)
+    (white-pieces board)
+    (black-pieces board)))
+
+;;------------------------------------------------------------------------------------------
+;;Piece Countine Functions
+;;------------------------------------------------------------------------------------------
+
+;;Note that the following 'piece counting' functions should have been already filtered by color, so
+;;they will only be counting pieces of that color.
+
+(defn count-kings
+  ;;Counts the number of kings on the board
+  [board]
+  (count (filter (fn [piece] (characters-equal? \k (toLowerCase (get piece :piece)))) board)))
+
+(defn count-queens
+  ;;Counts the number of queens on the board
+  [board]
+  (count (filter (fn [piece] (characters-equal? \q (toLowerCase (get piece :piece)))) board)))
+
+(defn count-castles
+  ;;Counts the number of castles on the board
+  [board]
+  (count (filter (fn [piece] (characters-equal? \r (toLowerCase (get piece :piece)))) board)))
+
+(defn count-bishops
+  ;;Counts the number of bishops on the board
+  [board]
+  (count (filter (fn [piece] (characters-equal? \b (toLowerCase (get piece :piece)))) board)))
+
+(defn count-knights
+  ;;Counts the number of knights on the board
+  (count (filter (fn [piece] (characters-equal? \n (toLowerCase (get piece :piece)))) board)))
+
+(defn count-pawns
+  ;;Counts the number of pawns on the board
+  (count (filter (fn [piece] (characters-equal? \p (toLowerCase (get piece :piece)))) board)))
 
 
 ;;------------------------------------------------------------------------------------------
@@ -635,11 +678,13 @@
 ;; Game Play
 ;;------------------------------------------------------------------------------------------
 
-
-;;Implemented the concept of a move set for a piece
-
-;;Start by making a function to move a set of move, or actually alter the board to reflect a move change
-
+(defn score-board
+  ;;Scores the board for a given player
+  ;;Returns a numeric score
+  [board color]
+  (let [pieces (pieces-of-color color board)]
+    )
+  )
 
 
 
