@@ -390,31 +390,7 @@
   (replace-in-FEN FEN :half-move-clock 0))
 
 ;;Now we have functions to work with both FEN and traditional algebraic board formats
-;;
-;;The game itself will be played in this way:
-;; 1. The FEN will be read to determine whose turn it is
-;; 2. For that color, we can then determine all possible moves
-;; 3. We can then rate each of the possible moves using Alpha Beta Minimax
-;; 4. We can then select the maximally valued move from the list of rated moves
-;; 5. We can then increment the half move clock if a pawn has not been captured
-;; 6. We can then switch whose turn it is
-;; 7. We can the increment the full move number
-;; 8. And repeat.
 
-;;Chess stopping conditions are:
-;; 1. Checkmate
-;; 2. Draw by:
-;;      - Stalemate: When the player to move is not in check but has no legal moves
-;;      - Insufficient Material: When there are endgames that look like:
-;;                               1. King against King
-;;                               2. King against King and Bishop
-;;                               3. King against King and Knight
-;;                               4. King and Bishop against King and Bishop where Bishops
-;;                                  are on the same colored squares
-;;                                  (I will not likely implement this)
-;;      - The fifty move rule: There has been no capture or pawn move in the last fifty moves
-;;                             by both players
-;;      - Threefold repetition: The same board position has occurred three times
 
 ;;------------------------------------------------------------------------------------------
 ;;Moving Functions
@@ -712,11 +688,35 @@
 ;;  {:from piece :to moves}
 ;;
 ;;  where piece is the piece on the current board and moves is the set of potential moves for that piece
+;;
+;; However, we want to end up with an exploded list that looks like:
+;;
+;;  ({:from pieceX :to Move1}, {:from pieceX :to Move2}, ..., {:from pieceX :to MoveN})
+;;
+;; where each item in the move set is a piece to a destination.
+
+(defn explode-moves
+  ;;Flattens the piece-to-list-of-moves form of the list of available moves to the piece-to-move list
+  ;;of available moves in a new form:
+  ;;         ({:from pieceX :to Move1}, {:from pieceX :to Move2}, ..., {:from pieceX :to MoveN})
+  ([piece-to-moves]
+   (explode-moves piece-to-moves '()))
+  ([piece-to-moves flat-moves]
+   (if (not-empty piece-to-moves)
+     (let [a-piece-to-moves-entry (first piece-to-moves)
+         piece (get a-piece-to-moves-entry :piece)
+         moves (get a-piece-to-moves-entry :moves)]
+       (recur (rest piece-to-moves) (explode-moves piece moves flat-moves)))
+     flat-moves))
+  ([piece moves flat-moves]
+   (if (not-empty moves)
+     (recur piece (rest moves) (conj flat-moves (assoc {} :from piece :to (first moves) :score 0)))
+     flat-moves)))
 
 (defn all-available-moves
   ;;Compiles a list of all moves available to the given player on the given board
   ([board color]
-   (all-available-moves board board color '()))
+   (explode-moves (all-available-moves board board color '())))
   ([dummy-board board color moves]
    (if (not-empty dummy-board)
      (let [piece (first dummy-board) piece-color (get piece :color)]
@@ -748,9 +748,7 @@
    (if (not-empty moves)
      (let [move (first moves)]
        (recur (rest moves) (+ number (count (get move :moves)))))
-     number)
-   )
-)
+     number)))
 
 (defn list-available-moves-for-piece
   [piece-moves]
@@ -772,6 +770,59 @@
 ;;------------------------------------------------------------------------------------------
 ;; Game Play
 ;;------------------------------------------------------------------------------------------
+
+;;The gamr itself will be played in this way:
+;; 1. The FEN will be read to determine whose turn it is
+;; 2. For that color, we can then determine all possible moves
+;; 3. We can then rate each of the possible moves using Alpha Beta Minimax
+;; 4. We can then select the maximally valued move from the list of rated moves
+;; 5. We can then actually make the move on the board
+;; 5. We can then increment the half move clock if a pawn has not been captured
+;; 6. We can then switch whose turn it is
+;; 7. We can the increment the full move number
+;; 8. And repeat.
+
+;;Chess stopping conditions are:
+;; 1. Checkmate
+;; 2. Draw by:
+;;      - Stalemate: When the player to move is not in check but has no legal moves
+;;      - Insufficient Material: When there are endgames that look like:
+;;                               1. King against King
+;;                               2. King against King and Bishop
+;;                               3. King against King and Knight
+;;                               4. King and Bishop against King and Bishop where Bishops
+;;                                  are on the same colored squares
+;;                                  (I will not implement this)
+;;      - The fifty move rule: There has been no capture or pawn move in the last fifty moves
+;;                             by both players
+;;      - Threefold repetition: The same board position has occurred three times
+;;                              (I will not be implementing this)
+
+
+(defn in-check
+  ;;A player is in check if his king is being attacked
+  []
+)
+
+(defn is-checkmate
+  ;;A player is in checkmate if his king is being attacked and has no possible moves
+  []
+  )
+
+(defn is-stalemate
+  ;;Stalemate has occured when the player has no legal moves
+  []
+  )
+
+(defn insufficient-material
+  ;;See the gameplay definition for insufficient material definition
+  []
+  )
+
+(defn fifty-move-rule-hit
+  ;;The fifty move rule, what is an impasse, has been hit when the halfmove clock has reached 50
+  [FEN]
+  (<= 50 (toInt (half-move-clock FEN))))
 
 
 ;;Left:
