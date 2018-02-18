@@ -55,10 +55,11 @@
 ;;Game Helper Functions
 ;;------------------------------------------------------------------------------------------
 
-(defn file-to-alpha
-  [file]
+(defn rank-file-to-alpha
+  [rank file]
   (def alphas '(A B C D E F G H))
-  (nth alphas (dec file)))
+  (if (and (> file 0) (<= file 8))
+    (str (nth alphas (dec file)) rank)))
 
 (defn dot
   [c]
@@ -71,6 +72,16 @@
     (if (Character/isUpperCase piece)
     \w
     \b)))
+
+(defn piece-is-white
+  ;;Determines if the piece is white
+  [piece]
+  (characters-equal? \w (get piece :color)))
+
+(defn piece-is-black
+  ;;Determines if the pieces is black
+  [piece]
+  (not (piece-is-white piece)))
 
 ;;-------------------------------------------------------------------------------------------
 ;;Define functions for working with the board in coordinate form
@@ -89,6 +100,7 @@
 ;; ({tuple 1}, {tuple 2}, {tuple 3})
 ;;------------------------------------------------------------------------------------------
 
+
 (defn print-piece
   ;;Pretty prints the contents of a piece
   [piece]
@@ -97,12 +109,10 @@
         alpha (get piece :algebraic)
         color (get piece :color)]
     (println (str
-              "----------------------------------"
-              "\nPiece: " p 
-              "\nCoordinates: {" (get coordinates :x) "," (get coordinates :y) 
-              "}\nAlgebraic Coordinates: " alpha 
-              "\nColor: " color
-              "\n------------------------------\n"))))
+              "\n    Piece: " p 
+              ", Coordinates: {" (get coordinates :x) "," (get coordinates :y) 
+              "}, Algebraic: " alpha 
+              ", Color: " color))))
 
 (defn print-pieces
   ;;Pretty prints a collection of pieces
@@ -131,7 +141,7 @@
         entry (assoc {} 
                 :piece piece
                 :coordinates (assoc {} :x rankNumber :y file)    
-                :algebraic (str (file-to-alpha file) rankNumber)
+                :algebraic (rank-file-to-alpha rankNumber file)
                 :color (pieceColor piece))]
     (if (not-empty (rest rank))
       (recur (rest rank) rankNumber (inc file) (conj board entry))
@@ -250,8 +260,6 @@
   [board]
   (str/join "/" (rankify-board board)))
 
-(FENify-ranks (board-from-FEN FEN))
-
 ;;------------------------------------------------------------------------------------------
 ;;Board Access Helper Functions
 ;;------------------------------------------------------------------------------------------
@@ -314,7 +322,7 @@
   [board]
   (filter (fn [piece] (characters-equal? \b (get piece :color))) board))
 
-(defn piece-of-color
+(defn pieces-of-color
   ;;Retrieves the pieces on the board of a given color
   [board color]
   (if (characters-equal? \w color)
@@ -420,10 +428,10 @@
 
 (defn out-of-bounds
   ;;Determines if the given piece is out of bounds.
-  ;;Failing criteria are: x < 0 || x > 8 || y < 0 || y > 8
+  ;;Failing criteria are: x < 1 || x > 8 || y < 1 || y > 8
   [piece]
   (let [coordinates (get piece :coordinates) x (get coordinates :x) y (get coordinates :y)]
-    (or (< x 0) (> x 8) (< y 0) (> y 8))))
+    (or (< x 1) (> x 8) (< y 1) (> y 8))))
 
 (defn in-bounds
   ;;Determines if the given piece is in bounds.
@@ -441,12 +449,10 @@
             test-coordinates (get test-piece :coordinates) 
             test-x (get test-coordinates :x) 
             test-y (get test-coordinates :y)
-            test-color (get test-piece :color)
 
             this-coordinates (get potential-piece :coordinates)
             this-x (get this-coordinates :x)
-            this-y (get this-coordinates :y)
-            this-color (get potential-piece :color)]
+            this-y (get this-coordinates :y)]
 
         (if (and (= test-x this-x) (= test-y this-y))
           test-piece
@@ -457,41 +463,45 @@
   [potential-piece board]
   (not (characters-equal? \. (get (get-space-on-board potential-piece board) :piece))))
 
+(defn landing-on-space
+  ;;Determines if a potential piece's move will land on a space
+  [potential-piece board]
+  (let [space-on-board (get-space-on-board potential-piece board)]
+    (characters-equal? \. (get space-on-board :piece))))
+
 (defn landing-on-same-color
   ;;Determines if a potential piece's move will land it on the same color piece
   [potential-piece board]
-  (let [space-on-board (get-space-on-board potential-piece board)]
-    (if space-on-board
-      (let [board-color (get space-on-board :color)
-            moving-piece-color (get potential-piece :color)]
-        (characters-equal? moving-piece-color board-color)))))
-
+  (let [space-on-board (get-space-on-board potential-piece board)
+        board-color (get space-on-board :color)
+        moving-piece-color (get potential-piece :color)]
+    (characters-equal? moving-piece-color board-color)))
 
 (defn landing-on-opposite-color
   ;;Determines if a potential piece's move will land it on a piece of the opposite color
   [potential-piece board]
-  (let [space-on-board (get-space-on-board potential-piece board)]
-    (if space-on-board
-      (let [board-color (get space-on-board :color)
-            moving-piece-color (get potential-piece :color)]
-        (not (characters-equal? moving-piece-color board-color))))))
+  (let [space-on-board (get-space-on-board potential-piece board)
+        board-color (get space-on-board :color)
+        moving-piece-color (get potential-piece :color)]
+    (and (not (characters-equal? \. (get space-on-board :piece))) (not (characters-equal? moving-piece-color board-color)))))
 
 
 (defn landing-on-space
   ;;Determines if a potential piece's move will land on a space
   [potential-piece board]
   (let [space-on-board (get-space-on-board potential-piece board)]
-    (if space-on-board
-      (characters-equal? \. (get space-on-board :piece)))))
+    (characters-equal? \. (get space-on-board :piece))))
 
 (defn define-move
   ;;Defines the abstract action that produces a move.
   ;;For a given piece, we translate it in x,y terms by applying the additive terms
   ;;which can be positively, negatively, or zero valued.
   [[piece x-additive y-additive]]
-  (let [current-coordinates (get piece :coordinates)]
-    (assoc piece :coordinates (assoc {} :x (+ (get current-coordinates :x) x-additive) 
-                                        :y (+ (get current-coordinates :y) y-additive)))))
+  (let [current-coordinates (get piece :coordinates)
+        x (+ (get current-coordinates :x) x-additive)
+        y (+ (get current-coordinates :y) y-additive)]
+    (assoc piece :coordinates (assoc {} :x x :y y)
+                 :algebraic (rank-file-to-alpha x y))))
 
 ;;--------------------
 ;;Pawns
@@ -501,12 +511,12 @@
   ;;and if so, converts the pawn to a queen
   [pawn]
   (let [coordinates (get pawn :coordinates)
-        y (get coordinates :y)]
-    (if (or (= 1 y) (= 8 y))
-      (if (= 1 y)
+        x (get coordinates :x)]
+    (if (and (piece-is-white pawn) (= x 8))
+      (assoc pawn :piece \Q)
+      (if (and (piece-is-black pawn) (= x 1))
         (assoc pawn :piece \q)
-        (assoc pawn :piece \Q))
-      pawn)))
+        pawn))))
 
 (defn pawn-move
   ;;The generic action of moving a pawn
@@ -519,9 +529,9 @@
    (filter some? (white-pawn-moves pawn board '())))
   ([pawn board accm]
    (let [coordinates (get pawn :coordinates)
-         y (get coordinates :y)
+         x (get coordinates :x)
          one-space (pawn-move pawn board 1 0)
-         two-spaces (if (and (= 2 y) (not (landing-on-same-color one-space board))) (pawn-move pawn board 2 0))
+         two-spaces (if (and (= 2 x) (not (space-occupied one-space board))) (pawn-move pawn board 2 0))
          potential-capture-left (pawn-move pawn board 1 -1)
          potential-capture-right (pawn-move pawn board 1 1)
          capture-left (if (landing-on-opposite-color potential-capture-left board) potential-capture-left)
@@ -535,9 +545,9 @@
    (filter some? (black-pawn-moves pawn board '())))
   ([pawn board accm]
    (let [coordinates (get pawn :coordinates)
-         y (get coordinates :y)
+         x (get coordinates :x)
          one-space (pawn-move pawn board -1 0)
-         two-spaces (if (and (= 7 y) (not (landing-on-same-color one-space board))) (pawn-move pawn board -2 0))
+         two-spaces (if (and (= 7 x) (not (landing-on-same-color one-space board))) (pawn-move pawn board -2 0))
          potential-capture-left (pawn-move pawn board -1 -1)
          potential-capture-right (pawn-move pawn board -1 1)
          capture-left (if (landing-on-opposite-color potential-capture-left board) potential-capture-left)
@@ -601,6 +611,7 @@
 ;;
 ;;----------------------------------------------------------
 
+
 ;;------------------
 ;;Castles
 
@@ -615,13 +626,13 @@
   ([castle board direction times moves]
    (if (< 0 times)
      (cond 
-      (characters-equal? \N direction) (let [move (define-move [castle 0 1])]
+      (characters-equal? \N direction) (let [move (define-move [castle 1 0])]
                                          (tile move board direction times moves))
-      (characters-equal? \S direction) (let [move (define-move [castle 0 -1])]
+      (characters-equal? \S direction) (let [move (define-move [castle -1 0])]
                                          (tile move board direction times moves))
-      (characters-equal? \E direction) (let [move (define-move [castle 1 0])]
+      (characters-equal? \E direction) (let [move (define-move [castle 0 1])]
                                          (tile move board direction times moves))
-      (characters-equal? \W direction) (let [move (define-move [castle -1 0])]
+      (characters-equal? \W direction) (let [move (define-move [castle 0 -1])]
                                          (tile move board direction times moves))
       ) moves)))
 
@@ -705,47 +716,62 @@
 (defn all-available-moves
   ;;Compiles a list of all moves available to the given player on the given board
   ([board color]
-   (all-available-moves board color '()))
-  ([board color moves]
-   (if (not-empty board)
-     (let [piece (first board) piece-color (get piece :color)]
+   (all-available-moves board board color '()))
+  ([dummy-board board color moves]
+   (if (not-empty dummy-board)
+     (let [piece (first dummy-board) piece-color (get piece :color)]
      (if (characters-equal? color piece-color)
        (let [piece-type (toLowerCase (get piece :piece))]
          (cond
           (characters-equal? \p piece-type) 
               (if (characters-equal? \w piece-color)
-                (recur (rest board) color (conj moves (assoc {} :piece piece :moves (white-pawn-moves piece board))))
-                (recur (rest board) color (conj moves (assoc {} :piece piece :moves (black-pawn-moves piece board)))))
+                (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (white-pawn-moves piece board) board))))
+                (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (black-pawn-moves piece board) board)))))
           (characters-equal? \r piece-type) 
-              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (castle-moves piece board) board))))
+              (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (castle-moves piece board) board))))
           (characters-equal? \b piece-type) 
-              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (bishop-moves piece board) board))))
+              (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (bishop-moves piece board) board))))
           (characters-equal? \q piece-type)
-              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (queens-moves piece board) board))))
+              (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (queens-moves piece board) board))))
           (characters-equal? \k piece-type) 
-              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (king-moves piece) board))))
+              (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (king-moves piece) board))))
           (characters-equal? \n piece-type)
-              (recur (rest board) color (conj moves (assoc {} :piece piece :moves (valid-moves (knight-moves piece) board))))))
-       (recur (rest board) color moves)))
+              (recur (rest dummy-board) board color (conj moves (assoc {} :piece piece :moves (valid-moves (knight-moves piece) board))))))
+       (recur (rest dummy-board) board color moves)))
      moves)))
+
+
+(defn count-available-moves
+  ([moves]
+   (count-available-moves moves 0))
+  ([moves number]
+   (if (not-empty moves)
+     (let [move (first moves)]
+       (recur (rest moves) (+ number (count (get move :moves)))))
+     number)
+   )
+)
+
+(defn list-available-moves-for-piece
+  [piece-moves]
+  (if (not-empty piece-moves)
+    (do (print-piece (first piece-moves))
+    (recur (rest piece-moves)))))
+
+(defn list-pieces-and-moves
+  [moves]
+  (if (not-empty moves)
+    (let [move (first moves)]
+      (do (println "----------------------")
+          (print-piece (get move :piece))
+          (println "----------------------")
+          (list-available-moves-for-piece (get move :moves)))
+       (recur (rest moves)))))
 
 
 ;;------------------------------------------------------------------------------------------
 ;; Game Play
 ;;------------------------------------------------------------------------------------------
-
-;; (defn score-board
-;;   ;;Scores the board for a given player
-;;   ;;Returns a numeric score
-;;   [board color]
-;;   (let [pieces (pieces-of-color color board)]
-;;     )
-;;   )
-
-;;The all available moves function works now! However, it looks like there are some invalids in there. Use the new pretty
-;;print function to view the generated list of moves. I may also write test functions for each piece.
-;;Is there a visual way I can do this?
-
 
 
 ;;Left:
