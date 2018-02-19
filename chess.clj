@@ -73,6 +73,13 @@
     \w
     \b)))
 
+(defn opposite-color
+  ;;Returns the opposite color: w -> b || b -> w
+  [color]
+  (if (characters-equal? \w color)
+    \b
+    \w))
+
 (defn piece-is-white
   ;;Determines if the piece is white
   [piece]
@@ -330,7 +337,7 @@
     (black-pieces board)))
 
 ;;------------------------------------------------------------------------------------------
-;;Piece Countine Functions
+;;Piece Counting Functions
 ;;------------------------------------------------------------------------------------------
 
 ;;Note that the following 'piece counting' functions should have been already filtered by color, so
@@ -388,9 +395,6 @@
   ;;Resets the halfmove clock to 0
   [FEN]
   (replace-in-FEN FEN :half-move-clock 0))
-
-;;Now we have functions to work with both FEN and traditional algebraic board formats
-
 
 ;;------------------------------------------------------------------------------------------
 ;;Moving Functions
@@ -740,38 +744,27 @@
        (recur (rest dummy-board) board color moves)))
      moves)))
 
+(defn all-available-moves-out-of-check
+  ;;Lists the moves available to a player to get his king out of check
+  []
+  )
 
-(defn count-available-moves
+(defn all-move-destinations
+  ;;Collects all of the landing spaces for the given list of moves
   ([moves]
-   (count-available-moves moves 0))
-  ([moves number]
+   (all-move-destinations moves '()))
+  ([moves landing-spaces]
    (if (not-empty moves)
      (let [move (first moves)]
-       (recur (rest moves) (+ number (count (get move :moves)))))
-     number)))
-
-(defn list-available-moves-for-piece
-  [piece-moves]
-  (if (not-empty piece-moves)
-    (do (print-piece (first piece-moves))
-    (recur (rest piece-moves)))))
-
-(defn list-pieces-and-moves
-  [moves]
-  (if (not-empty moves)
-    (let [move (first moves)]
-      (do (println "----------------------")
-          (print-piece (get move :piece))
-          (println "----------------------")
-          (list-available-moves-for-piece (get move :moves)))
-       (recur (rest moves)))))
+       (recur (rest moves) (conj landing-spaces (get move :to))))
+     landing-spaces)))
 
 
 ;;------------------------------------------------------------------------------------------
 ;; Game Play
 ;;------------------------------------------------------------------------------------------
 
-;;The gamr itself will be played in this way:
+;;The game itself will be played in this way:
 ;; 1. The FEN will be read to determine whose turn it is
 ;; 2. For that color, we can then determine all possible moves
 ;; 3. We can then rate each of the possible moves using Alpha Beta Minimax
@@ -798,25 +791,74 @@
 ;;      - Threefold repetition: The same board position has occurred three times
 ;;                              (I will not be implementing this)
 
+(defn retrieve-king
+  ;;Retrieves the king of a color from the given board
+  ([board color]
+   (retrieve-king (pieces-of-color board color)))
+  ([board]
+  (let [piece (first board)
+        pieceID (toLowerCase (get piece :piece))]
+    (if (characters-equal? \k pieceID)
+      piece
+      (recur (rest board))))))
+
+(defn spaces-being-attacked-by-color
+  ;;Compiles a list of spaces that are under attack on the board by a given color
+  [board color]
+  (all-move-destinations (all-available-moves board color)))
+
+(defn piece-being-attacked?
+  ;;Returns true if this color's piece resides in the attacking color's list of attacking squares
+  ;;Note that if we do find a piece, it is sufficient to return the truthy condition we found it
+  ;;under. Otherwise, nil suffices as falsey
+  ([piece board color]
+   (piece-being-attacked? (spaces-being-attacked-by-color board (opposite-color color)) piece))
+  ([attack-destinations piece]
+   (if (not-empty attack-destinations)
+     (let [attack-destination (first attack-destinations)
+
+         attack-coordinates (get attack-destination :coordinates)
+         attackX (get attack-coordinates :x)
+         attackY (get attack-coordinates :y)
+
+         piece-coordinates (get piece :coordinates)
+         pieceX (get piece-coordinates :x)
+         pieceY (get piece-coordinates :y)]
+
+     (if (and (= attackX pieceX) (= attackY pieceY))
+       (and (= attackX pieceX) (= attackY pieceY))
+       (recur (rest attack-destinations) piece))))))
 
 (defn in-check
-  ;;A player is in check if his king is being attacked
-  []
-)
+  ;;A player is in check if his king is being attacked by the other player
+  [board color]
+  (piece-being-attacked? (retrieve-king board) board color))
+
+;;Looks like filter wont work well (WHY!?) so build the filter in anonymous functions or a separate one
+;;You were trying 
 
 (defn is-checkmate
-  ;;A player is in checkmate if his king is being attacked and has no possible moves
-  []
-  )
+  ;;A player is in checkmate if his king is being attacked and has no possible moves to get out of check
+  [board color]
+  (if (in-check board color)
+    (let [king (retrieve-king board color)
+          king-moves (king-moves king)
+          spaces-being-attacked (piece-being-attacked? spac king-move)])
+    (empty? (filter  king-moves))))
+
+
+
+;;if a king move is in the spaces-being-attacked, remove it, if all 
 
 (defn is-stalemate
   ;;Stalemate has occured when the player has no legal moves
-  []
-  )
+  [board color]
+  (empty? (all-available-moves board color)))
 
 (defn insufficient-material
   ;;See the gameplay definition for insufficient material definition
   []
+  ;;Implementing later
   )
 
 (defn fifty-move-rule-hit
@@ -827,6 +869,8 @@
 
 ;;Left:
 ;;
+;;    -
+;;    -May not move into check - Filter in valid moves
 ;;    -En Passant
 ;;    -Castling Moves - Add to king
 ;;    -Scoring
