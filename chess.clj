@@ -595,7 +595,6 @@
 ;;------------------
 ;;Castles
 
-
 (defn castle-moves
   ;;Generates the potential moves a given castle can make on the board.
   ([castle board]
@@ -810,7 +809,7 @@
 (defn piece-being-attacked?
   ;;Returns true if this color's piece resides in the attacking color's list of attacking squares
   ;;Note that if we do find a piece, it is sufficient to return the truthy condition we found it
-  ;;under. Otherwise, nil suffices as falsey
+  ;;under. Otherwise, nil suffices as falsey.
   ([piece board color]
    (piece-being-attacked? (spaces-being-attacked-by-color board (opposite-color color)) piece))
   ([attack-destinations piece]
@@ -834,21 +833,20 @@
   [board color]
   (piece-being-attacked? (retrieve-king board) board color))
 
-;;Looks like filter wont work well (WHY!?) so build the filter in anonymous functions or a separate one
-;;You were trying 
-
 (defn is-checkmate
   ;;A player is in checkmate if his king is being attacked and has no possible moves to get out of check
   [board color]
   (if (in-check board color)
     (let [king (retrieve-king board color)
-          king-moves (king-moves king)
-          spaces-being-attacked (piece-being-attacked? spac king-move)])
-    (empty? (filter  king-moves))))
-
-
-
-;;if a king move is in the spaces-being-attacked, remove it, if all 
+          king-moves (valid-moves (king-moves king) board)
+          spaces-being-attacked (spaces-being-attacked-by-color board (opposite-color color))]
+      (empty? ((fn [king-moves attacks evasive-moves]
+                 (if (not-empty king-moves)
+                   (let [king-move (first king-moves)]
+                     (if (not (piece-being-attacked? attacks king-move))
+                       (recur (rest king-moves) attacks (conj evasive-moves king-move))
+                       (recur (rest king-moves) attacks evasive-moves)))
+                   evasive-moves)) king-moves spaces-being-attacked '())))))
 
 (defn is-stalemate
   ;;Stalemate has occured when the player has no legal moves
@@ -868,8 +866,7 @@
 
 
 ;;Left:
-;;
-;;    -
+
 ;;    -May not move into check - Filter in valid moves
 ;;    -En Passant
 ;;    -Castling Moves - Add to king
