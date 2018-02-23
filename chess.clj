@@ -297,7 +297,8 @@
 
 (defn get-player
   ;;Retrieves the character in String form from the FEN string that represents whose turn it is: w or b
-  [FEN]  (get-from-FEN FEN :player))
+  [FEN]  
+  (get-from-FEN FEN :player))
 
 (defn get-castling-availability
   ;;Gets the castling availability component fromt the FEN String
@@ -760,35 +761,10 @@
 
 
 ;;------------------------------------------------------------------------------------------
-;; Game Play
+;;Game State Functions
 ;;------------------------------------------------------------------------------------------
 
-;;The game itself will be played in this way:
-;; 1. The FEN will be read to determine whose turn it is
-;; 2. For that color, we can then determine all possible moves
-;; 3. We can then rate each of the possible moves using Alpha Beta Minimax
-;; 4. We can then select the maximally valued move from the list of rated moves
-;; 5. We can then actually make the move on the board
-;; 5. We can then increment the half move clock if a pawn has not been captured
-;; 6. We can then switch whose turn it is
-;; 7. We can the increment the full move number
-;; 8. And repeat.
 
-;;Chess stopping conditions are:
-;; 1. Checkmate
-;; 2. Draw by:
-;;      - Stalemate: When the player to move is not in check but has no legal moves
-;;      - Insufficient Material: When there are endgames that look like:
-;;                               1. King against King
-;;                               2. King against King and Bishop
-;;                               3. King against King and Knight
-;;                               4. King and Bishop against King and Bishop where Bishops
-;;                                  are on the same colored squares
-;;                                  (I will not implement this)
-;;      - The fifty move rule: There has been no capture or pawn move in the last fifty moves
-;;                             by both players
-;;      - Threefold repetition: The same board position has occurred three times
-;;                              (I will not be implementing this)
 
 (defn retrieve-king
   ;;Retrieves the king of a color from the given board
@@ -855,18 +831,111 @@
 
 (defn insufficient-material
   ;;See the gameplay definition for insufficient material definition
-  []
+  [board color]
   ;;Implementing later
   )
 
-(defn fifty-move-rule-hit
+(defn fifty-move-rule
   ;;The fifty move rule, what is an impasse, has been hit when the halfmove clock has reached 50
   [FEN]
   (<= 50 (toInt (half-move-clock FEN))))
 
+;;------------------------------------------------------------------------------------------
+;; Game Play
+;;------------------------------------------------------------------------------------------
+
+(defn make-move
+  ;;Actually performs the move on the board
+  ([move board]
+   (make-move move board '() '()))
+  ([move board final-board captures]
+   (if (not-empty board)
+     (let [departure (get move :from)
+           departureCoordinates (get departure :coordinates)
+           departureX (get departureCoordinates :x)
+           departureY (get departureCoordinates :y)
+
+           destination (get move :to)
+           destinationCoordinates (get destination :coordinates)
+           destinationX (get destinationCoordinates :x)
+           destinationY (get destinationCoordinates :y)
+
+           board-location (first board)
+           boardX (get board-location :x)
+           boardY (get board-location :y)]
+     
+     (if (and (= boardX departureX) (= boardY departureY))
+       (let [departure-square (assoc departure :piece \.)]
+         (recur move (rest board) (conj final-board departure-square) captures))
+       (if (and (= boardX destinationX) (= boardY destinationY))
+         (recur move (rest board) (conj final-board destination) (conj captures board-location))
+         (recur move (rest board) (conj final-board board-location) captures)))
+  ) (assoc {} :new-board final-board :captures captures))))
+
+(defn select-random-move
+  ;;Selects a random move from the list of given moves
+  [moves]
+  (nth moves (rand-int (- (count moves) 1))))
+
+;;The game itself will be played in this way:
+;; 1. The FEN will be read to determine whose turn it is
+;; 2. For that color, we can then determine all possible moves
+;; 3. We can then rate each of the possible moves using Alpha Beta Minimax
+;; 4. We can then select the maximally valued move from the list of rated moves
+;; 5. We can then actually make the move on the board
+;; 5. We can then increment the half move clock if a pawn has not been captured
+;; 6. We can then switch whose turn it is
+;; 7. We can the increment the full move number
+;; 8. And repeat.
+
+;;Chess stopping conditions are:
+;; 1. Checkmate
+;; 2. Draw by:
+;;      - Stalemate: When the player to move is not in check but has no legal moves
+;;      - Insufficient Material: When there are endgames that look like:
+;;                               1. King against King
+;;                               2. King against King and Bishop
+;;                               3. King against King and Knight
+;;                               4. King and Bishop against King and Bishop where Bishops
+;;                                  are on the same colored squares
+;;                                  (I will not implement this)
+;;      - The fifty move rule: There has been no capture or pawn move in the last fifty moves
+;;                             by both players
+;;      - Threefold repetition: The same board position has occurred three times
+;;                              (I will not be implementing this)
+
+(defn play
+  ;;Plays chess!
+  [FEN]
+  (let [board (board-from-FEN FEN)
+        player (get-player FEN)]
+    (cond 
+     (is-checkmate board player) (do (prn "Checkmate!")
+                                     (prn (str (opposite-color player) " wins!"))
+                                     (System/exit 0))
+     
+     (is-stalemate board player) (do (prn "Stalemate!")
+                                     (System/exit 0))
+
+     (insufficient-material board player) (do (prn "Draw by insufficient material!")
+                                              ((System/exit 0)))
+
+     (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!")
+                               (System/exit 0))
+
+     :else (let [available-moves (all-available-moves board player)
+                 selected-move (select-random-move available-moves)
+                 move-result (make-move selected-move board)
+                 new-board (get move-result :new-board)
+                 captures (get move-result :captures)])
+     
+     )
+)
+  )
 
 ;;Left:
 
+;;    =Insufficient material
 ;;    -May not move into check - Filter in valid moves
 ;;    -En Passant
 ;;    -Castling Moves - Add to king
