@@ -281,6 +281,11 @@
   [FEN component value]
   (str/join " " (assoc (vector-FEN FEN) (get FEN-indeces component) value)))
 
+(defn FENify-board
+  ;;Assimilates the board component of the FEN string into the given FEN
+  [board FEN]
+  (replace-in-FEN FEN :board (FENify-ranks board)))
+
 (defn get-from-FEN
   ;;Retrieves the give component from the FEN String
   [FEN component]
@@ -592,7 +597,6 @@
 ;;
 ;;----------------------------------------------------------
 
-
 ;;------------------
 ;;Castles
 
@@ -861,16 +865,23 @@
            destinationY (get destinationCoordinates :y)
 
            board-location (first board)
-           boardX (get board-location :x)
-           boardY (get board-location :y)]
+           board-coordinates (get board-location :coordinates)
+           boardX (get board-coordinates :x)
+           boardY (get board-coordinates :y)]
      
-     (if (and (= boardX departureX) (= boardY departureY))
-       (let [departure-square (assoc departure :piece \.)]
-         (recur move (rest board) (conj final-board departure-square) captures))
-       (if (and (= boardX destinationX) (= boardY destinationY))
-         (recur move (rest board) (conj final-board destination) (conj captures board-location))
-         (recur move (rest board) (conj final-board board-location) captures)))
-  ) (assoc {} :new-board final-board :captures captures))))
+       ;; (do (prn (str "Departure: " (get departure :piece) " {" departureX "," departureY "}"))
+       ;;     (prn (str "Destination: " (get destination :piece) " {" destinationX "," destinationY "}"))
+       ;;     (prn ""))
+
+       (if (and (= boardX departureX) (= boardY departureY))
+         (let [departure-square (assoc departure :piece \.)]
+           (do ;;(prn "Departing") 
+               (recur move (rest board) (conj final-board departure-square) captures)))
+         (if (and (= boardX destinationX) (= boardY destinationY))
+           (do ;;(prn "Capturing")
+             (recur move (rest board) (conj final-board destination) (conj captures board-location)))
+           (recur move (rest board) (conj final-board board-location) captures)))
+       ) (assoc {} :new-board final-board :captures captures))))
 
 (defn select-random-move
   ;;Selects a random move from the list of given moves
@@ -907,31 +918,29 @@
 (defn play
   ;;Plays chess!
   [FEN]
+  (Thread/sleep 2000)
   (let [board (board-from-FEN FEN)
         player (get-player FEN)]
+    (do (print-board-FEN FEN))
     (cond 
      (is-checkmate board player) (do (prn "Checkmate!")
-                                     (prn (str (opposite-color player) " wins!"))
-                                     (System/exit 0))
+                                     (prn (str (opposite-color player) " wins!")))
      
-     (is-stalemate board player) (do (prn "Stalemate!")
-                                     (System/exit 0))
+     (is-stalemate board player) (do (prn "Stalemate!"))
 
-     (insufficient-material board player) (do (prn "Draw by insufficient material!")
-                                              ((System/exit 0)))
+     (insufficient-material board player) (do (prn "Draw by insufficient material!"))
 
-     (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!")
-                               (System/exit 0))
+     (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!"))
 
      :else (let [available-moves (all-available-moves board player)
                  selected-move (select-random-move available-moves)
                  move-result (make-move selected-move board)
                  new-board (get move-result :new-board)
-                 captures (get move-result :captures)])
-     
-     )
-)
-  )
+                 captures (get move-result :captures)
+                 FEN-with-board (FENify-board new-board FEN)
+                 FEN-with-player (change-player FEN-with-board)]
+
+             (recur FEN-with-player)))))
 
 ;;Left:
 
