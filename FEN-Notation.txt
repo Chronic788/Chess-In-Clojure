@@ -64,3 +64,64 @@ Ranks are numberic.
         3       
         2
         1
+
+Scoring Function
+---------------
+
+f(p) = 200(K-K')
+       + 9(Q-Q')
+       + 5(R-R')
+       + 3(B-B' + N-N')
+       + 1(P-P')
+       - 0.5(D-D' + S-S' + I-I')
+       + 0.1(M-M') + ...
+ 
+KQRBNP = number of kings, queens, rooks, bishops, knights and pawns
+D,S,I = doubled, blocked and isolated pawns
+M = Mobility (the number of legal moves)
+
+My function
+-----------
+
+F(p) = 200k +
+       9Q +
+       5R +
+       3B +
+       3N +
+       1P +
+       5 Check +
+       2 Center Controlled or Attacked Space
+       .5 mobility +
+
+
+AB Minimax
+----------
+
+function minimax(node, depth, isMaximizingPlayer, alpha, beta):
+
+    if node is a leaf node :
+        return value of the node
+    
+    if isMaximizingPlayer :
+        bestVal = -INFINITY 
+        for each child node :
+            value = minimax(node, depth+1, false, alpha, beta)
+            bestVal = max( bestVal, value) 
+            alpha = max( alpha, bestVal)
+            if beta <= alpha:
+                break
+        return bestVal
+
+    else :
+        bestVal = +INFINITY 
+        for each child node :
+            value = minimax(node, depth+1, true, alpha, beta)
+            bestVal = min( bestVal, value) 
+            beta = min( beta, bestVal)
+            if beta <= alpha:
+                break
+        return bestVal
+
+First call:
+
+minimax(0, 0, true, -INFINITY, +INFINITY)

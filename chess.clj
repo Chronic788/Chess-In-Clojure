@@ -90,6 +90,16 @@
   [piece]
   (not (piece-is-white piece)))
 
+(defn is-white
+  ;;Determines if the color given is white
+  [color]
+  (characters-equal? \w color))
+
+(defn is-black
+  ;;Determines if the color given is black
+  [color]
+  (not (is-white color)))
+
 ;;-------------------------------------------------------------------------------------------
 ;;Define functions for working with the board in coordinate form
 ;;
@@ -650,8 +660,10 @@
   ;;Generates the potential moves a given queen can make on the board. Defined in
   ;;terms of a bishop and a castle, we have all the moves! WOOO Functional Programming!
   [queen board]
-  (concat (castle-moves (assoc queen :piece \r) board) 
-          (bishop-moves (assoc queen :piece \b) board)))
+  (map (fn [piece] (if (piece-is-white piece)
+                     (assoc piece :piece \Q)
+                     (assoc piece :piece \q))) (concat (castle-moves (assoc queen :piece \r) board) 
+                                                       (bishop-moves (assoc queen :piece \b) board))))
 
 ;;-----------------
 ;;Abstract tiling behavior
@@ -748,10 +760,21 @@
        (recur (rest dummy-board) board color moves)))
      moves)))
 
-(defn all-available-moves-out-of-check
+(defn available-moves-out-of-check
   ;;Lists the moves available to a player to get his king out of check
-  []
-  )
+  ;;In order to do this, we generate all available moves, make each one, and recurd if it successfuy moves
+  ;;the player out of check
+  ([board color]
+  (available-moves-out-of-check (all-available-moves board color) board color '()))
+  ([available-moves board color moves-out-of-check]
+   (if (not-empty available-moves)
+     (let [move (first available-moves)
+           move-result (make-move move board)
+           resulting-board (get move-result :new-board)]
+       (if (not (in-check resulting-board color))
+         (recur (rest available-moves) board color (conj moves-out-of-check move))
+         (recur (rest available-moves) board color moves-out-of-check)))
+     moves-out-of-check)))
 
 (defn all-move-destinations
   ;;Collects all of the landing spaces for the given list of moves
@@ -767,8 +790,6 @@
 ;;------------------------------------------------------------------------------------------
 ;;Game State Functions
 ;;------------------------------------------------------------------------------------------
-
-
 
 (defn retrieve-king
   ;;Retrieves the king of a color from the given board
@@ -844,6 +865,11 @@
   [FEN]
   (<= 50 (toInt (half-move-clock FEN))))
 
+(defn game-over
+  ;;Determines if the game is over for some reason
+  [board color]
+  (or (is-checkmate board color) (is-stalemate board color) (fifty-move-rule board color)))
+
 ;;------------------------------------------------------------------------------------------
 ;; Game Play
 ;;------------------------------------------------------------------------------------------
@@ -868,18 +894,12 @@
            board-coordinates (get board-location :coordinates)
            boardX (get board-coordinates :x)
            boardY (get board-coordinates :y)]
-     
-       ;; (do (prn (str "Departure: " (get departure :piece) " {" departureX "," departureY "}"))
-       ;;     (prn (str "Destination: " (get destination :piece) " {" destinationX "," destinationY "}"))
-       ;;     (prn ""))
 
        (if (and (= boardX departureX) (= boardY departureY))
          (let [departure-square (assoc departure :piece \.)]
-           (do ;;(prn "Departing") 
-               (recur move (rest board) (conj final-board departure-square) captures)))
+           (recur move (rest board) (conj final-board departure-square) captures))
          (if (and (= boardX destinationX) (= boardY destinationY))
-           (do ;;(prn "Capturing")
-             (recur move (rest board) (conj final-board destination) (conj captures board-location)))
+           (recur move (rest board) (conj final-board destination) (conj captures board-location))
            (recur move (rest board) (conj final-board board-location) captures)))
        ) (assoc {} :new-board final-board :captures captures))))
 
@@ -887,6 +907,21 @@
   ;;Selects a random move from the list of given moves
   [moves]
   (nth moves (rand-int (- (count moves) 1))))
+
+(defn score-board
+  ;;Returns a numeric score for the board
+  ([board color]
+   (if (is-white color)
+     (score-board (white-pieces board) color nil)
+     (score-board (black-pieces board) color nil)))
+  ([board color dummyParam]
+   (+ (* 200 (count-kings board))
+     (* 9 (count-queens board))
+     (* 5 (count-castles board))
+     (* 3 (count-bishops board))
+     (* 3 (count-knights board))
+     (* 1 (count-pawns board))))
+  )
 
 ;;The game itself will be played in this way:
 ;; 1. The FEN will be read to determine whose turn it is
@@ -918,7 +953,7 @@
 (defn play
   ;;Plays chess!
   [FEN]
-  (Thread/sleep 2000)
+  ;;(Thread/sleep 2000)
   (let [board (board-from-FEN FEN)
         player (get-player FEN)]
     (do (print-board-FEN FEN))
@@ -932,7 +967,9 @@
 
      (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!"))
 
-     :else (let [available-moves (all-available-moves board player)
+     :else (let [available-moves (if (in-check board player)
+                                   (available-moves-out-of-check board player)
+                                   (all-available-moves board player))
                  selected-move (select-random-move available-moves)
                  move-result (make-move selected-move board)
                  new-board (get move-result :new-board)
@@ -942,13 +979,16 @@
 
              (recur FEN-with-player)))))
 
+
+;;You were working on scoring. See the FEN Notation document for alpha beta pseudocode and =
+;;your own scoring function
+
 ;;Left:
 
 ;;    =Insufficient material
 ;;    -May not move into check - Filter in valid moves
-;;    -En Passant
 ;;    -Castling Moves - Add to king
-;;    -Scoring
+;;    -Finish scoring
 ;;    -Alpha Beta Minimax
 ;;    -Random Moving
 ;;    -API with Chess.js
