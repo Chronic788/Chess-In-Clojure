@@ -1,6 +1,10 @@
 
 (require '[clojure.string :as str])
 
+(def max-int 9999999999)
+(def min-int -9999999999)
+
+(def search-depth 10)
 
 ;;Define the starting position
 (def FEN "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1")
@@ -356,38 +360,43 @@
 ;;Piece Counting Functions
 ;;------------------------------------------------------------------------------------------
 
-;;Note that the following 'piece counting' functions should have been already filtered by color, so
-;;they will only be counting pieces of that color.
-
 (defn count-kings
   ;;Counts the number of kings on the board
-  [board]
-  (count (filter (fn [piece] (characters-equal? \k (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \k (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
 
 (defn count-queens
   ;;Counts the number of queens on the board
-  [board]
-  (count (filter (fn [piece] (characters-equal? \q (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \q (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
 
 (defn count-castles
   ;;Counts the number of castles on the board
-  [board]
-  (count (filter (fn [piece] (characters-equal? \r (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \r (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
 
 (defn count-bishops
   ;;Counts the number of bishops on the board
-  [board]
-  (count (filter (fn [piece] (characters-equal? \b (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \b (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
 
 (defn count-knights
-  [board]
   ;;Counts the number of knights on the board
-  (count (filter (fn [piece] (characters-equal? \n (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \n (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
 
 (defn count-pawns
-  [board]
   ;;Counts the number of pawns on the board
-  (count (filter (fn [piece] (characters-equal? \p (toLowerCase (get piece :piece)))) board)))
+  [board color]
+  (count (filter (fn [piece] (characters-equal? \p (toLowerCase (get piece :piece)))) (pieces-of-color board color))))
+
+(defn count-center-pawns
+  ;;Counts the number of pawns on files d and e
+  [board color]
+  (count (filter (fn [piece] 
+                   (let [piece-type (get piece :piece)
+                         y (get (get piece :coordinates) :y)]
+                     (and (or (= 4 y) (= 5 y)) (characters-equal? \p (toLowerCase (get piece :piece)))))) (pieces-of-color board color))))
 
 
 ;;------------------------------------------------------------------------------------------
@@ -526,7 +535,8 @@
   ([pawn board accm]
    (let [coordinates (get pawn :coordinates)
          x (get coordinates :x)
-         one-space (pawn-move pawn board 1 0)
+         one-space-move (pawn-move pawn board 1 0)
+         one-space (if (landing-on-space one-space-move board) one-space-move)
          two-spaces (if (and (= 2 x) (not (space-occupied one-space board))) (pawn-move pawn board 2 0))
          potential-capture-left (pawn-move pawn board 1 -1)
          potential-capture-right (pawn-move pawn board 1 1)
@@ -542,7 +552,8 @@
   ([pawn board accm]
    (let [coordinates (get pawn :coordinates)
          x (get coordinates :x)
-         one-space (pawn-move pawn board -1 0)
+         one-space-move (pawn-move pawn board -1 0)
+         one-space (if (landing-on-space one-space-move board) one-space-move)
          two-spaces (if (and (= 7 x) (not (landing-on-same-color one-space board))) (pawn-move pawn board -2 0))
          potential-capture-left (pawn-move pawn board -1 -1)
          potential-capture-right (pawn-move pawn board -1 1)
@@ -776,6 +787,13 @@
          (recur (rest available-moves) board color moves-out-of-check)))
      moves-out-of-check)))
 
+(defn possible-moves
+  ;;Returns the appropriate list of available moves based on check
+  [board player]
+  (if (in-check board player)
+    (available-moves-out-of-check board player)
+    (all-available-moves board player)))
+
 (defn all-move-destinations
   ;;Collects all of the landing spaces for the given list of moves
   ([moves]
@@ -868,7 +886,20 @@
 (defn game-over
   ;;Determines if the game is over for some reason
   [board color]
-  (or (is-checkmate board color) (is-stalemate board color) (fifty-move-rule board color)))
+  (or (is-checkmate board color) (is-stalemate board color)))
+
+(defn center-control-score
+  ;;Returns how many of the four center squares are either being occupied by and or how many times each
+  ;;square is being attacked by the given player:
+  ;; {5,4}, {5,5}, {4,4}, {4,5}
+  [board color]
+  (count (filter (fn [piece] (let [coordinates (get piece :coordinates)
+                                    x (get coordinates :x)
+                                    y (get coordinates :y)]
+                                (or (and (= 5 x) (= 4 y)) 
+                                    (and (= 5 x) (= 5 y))
+                                    (and (= 4 x) (= 4 y))
+                                    (and (= 4 x) (= 5 y)))))  (concat board (spaces-being-attacked-by-color board color)))))
 
 ;;------------------------------------------------------------------------------------------
 ;; Game Play
@@ -903,25 +934,102 @@
            (recur move (rest board) (conj final-board board-location) captures)))
        ) (assoc {} :new-board final-board :captures captures))))
 
+(defn generate-board-states
+  ;;Generates a list of board states that are the results of making the moves passed to it
+  ([moves board]
+   (generate-board-states moves board '()))
+  ([moves board states] 
+   (if (not-empty moves)
+     (let [move (first moves)]
+       (recur (rest moves) board (conj states (get (make-move move board) :new-board))))
+     states)))
+
+(defn score-board
+  ;;Returns a numeric score for the board
+  [board color]
+  (+ (* 200 (count-kings board color))
+     (* 9 (count-queens board color))
+     (* 5 (count-castles board color))
+     (* 3 (count-bishops board color))
+     (* 3 (count-knights board color))
+     (* 2 (count-center-pawns board color))
+     (* 1 (count-pawns board color))
+     (* 5 (if (in-check board (opposite-color color))
+            1
+            0))
+     (* 0.1 (count (all-available-moves board color)))
+     (* 0.25 (center-control-score board color))))
+
+(defn maximize
+  ;;Performs the maximizing function of the mini max function
+  [children color depth maximizing alpha beta best-score]
+  (if (not-empty children)
+    (if (> beta alpha)
+      (let [board (first children)
+            score (mini-max board (opposite-color color) (inc depth) false alpha beta)
+            new-best (max best-score score)
+            new-alpha (max alpha new-best)]
+        (recur (rest children) color depth maximizing alpha beta new-best)))
+    best-score))
+
+(defn minimize
+  ;;Performs the minimizing function of the mini max function
+  [children color depth maximizing alpha beta best-score]
+  (if (not-empty children)
+    (if (> beta alpha)
+      (let [board (first children)
+            score (mini-max board (opposite-color color) (inc depth) true alpha beta)
+            new-best (min best-score score)
+            beta (min beta new-best)]
+        (recur (rest children) color depth maximizing alpha beta new-best)))
+    best-score))
+
+(defn mini-max
+  ;;Performs Mini Max search with Alpha Beta pruning. A Node is considered to be a board state.
+  [board color depth maximizing alpha beta]
+  (let [available-moves (possible-moves board color)]
+    (if (or (game-over board color) (empty? available-moves) (= depth search-depth))
+      (if (is-checkmate board color)
+        max-int
+        (score-board board color))
+      (if maximizing
+        (do ;;(prn "Maximizing")
+            (maximize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta min-int))
+        (do ;;(prn "MiniMizing")
+            (minimize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta max-int)
+)
+        ))))
+
+(defn score-moves
+  ;;Assigns scores to each move in the list passed into it
+  ([moves board color]
+   (score-moves moves '() board color))
+  ([moves scored-moves board color]
+   (if (not-empty moves)
+     (let [move (first moves)]
+       (recur (rest moves) (conj scored-moves (assoc move :score (mini-max board color 0 true min-int max-int))) board color))
+     scored-moves)))
+
+(defn select-best-move
+  ;;Returns the move with the best overall score
+  ([moves]
+   (select-best-move moves (first moves)))
+  ([moves best-move]
+   (if (not-empty moves)
+     (let [move (first moves)
+         move-score (get move :score)
+         best-score (get best-move :score)]
+       (if (> move-score best-score)
+         (recur (rest moves) move)
+         (recur (rest moves) best-move)))
+     best-move))
+  )
+
 (defn select-random-move
   ;;Selects a random move from the list of given moves
   [moves]
   (nth moves (rand-int (- (count moves) 1))))
 
-(defn score-board
-  ;;Returns a numeric score for the board
-  ([board color]
-   (if (is-white color)
-     (score-board (white-pieces board) color nil)
-     (score-board (black-pieces board) color nil)))
-  ([board color dummyParam]
-   (+ (* 200 (count-kings board))
-     (* 9 (count-queens board))
-     (* 5 (count-castles board))
-     (* 3 (count-bishops board))
-     (* 3 (count-knights board))
-     (* 1 (count-pawns board))))
-  )
 
 ;;The game itself will be played in this way:
 ;; 1. The FEN will be read to determine whose turn it is
@@ -945,8 +1053,8 @@
 ;;                               4. King and Bishop against King and Bishop where Bishops
 ;;                                  are on the same colored squares
 ;;                                  (I will not implement this)
-;;      - The fifty move rule: There has been no capture or pawn move in the last fifty moves
-;;                             by both players
+;;      - The fifty move rule: There has been no capture in the last fifty moves
+;;                             by either player
 ;;      - Threefold repetition: The same board position has occurred three times
 ;;                              (I will not be implementing this)
 
@@ -967,10 +1075,8 @@
 
      (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!"))
 
-     :else (let [available-moves (if (in-check board player)
-                                   (available-moves-out-of-check board player)
-                                   (all-available-moves board player))
-                 selected-move (select-random-move available-moves)
+     :else (let [scored-moves (score-moves (possible-moves board player) board player)
+                 selected-move (select-best-move scored-moves)
                  move-result (make-move selected-move board)
                  new-board (get move-result :new-board)
                  captures (get move-result :captures)
@@ -980,12 +1086,9 @@
              (recur FEN-with-player)))))
 
 
-;;You were working on scoring. See the FEN Notation document for alpha beta pseudocode and =
-;;your own scoring function
-
 ;;Left:
 
-;;    =Insufficient material
+;;    -Insufficient material
 ;;    -May not move into check - Filter in valid moves
 ;;    -Castling Moves - Add to king
 ;;    -Finish scoring
