@@ -4,7 +4,7 @@
 (def max-int 9999999999)
 (def min-int -9999999999)
 
-(def search-depth 3)
+(def search-depth 5)
 
 ;;Starting position
 (def FEN "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1")
@@ -230,7 +230,7 @@
 (defn print-board-FEN
   ;;Prints the board using a FEN String
   [FEN]
-  (print-ranks (get-FEN-ranks FEN))
+  (print-ranks (reverse (get-FEN-ranks FEN)))
   (println)
   (println))
 
@@ -896,12 +896,6 @@
   [board color]
   (empty? (all-available-moves board color)))
 
-(defn insufficient-material
-  ;;See the gameplay definition for insufficient material definition
-  [board color]
-  ;;Implementing later
-  )
-
 (defn fifty-move-rule
   ;;The fifty move rule, what is an impasse, has been hit when the halfmove clock has reached 50
   [FEN]
@@ -1065,13 +1059,7 @@
 ;; 1. Checkmate
 ;; 2. Draw by:
 ;;      - Stalemate: When the player to move is not in check but has no legal moves
-;;      - Insufficient Material: When there are endgames that look like:
-;;                               1. King against King
-;;                               2. King against King and Bishop
-;;                               3. King against King and Knight
-;;                               4. King and Bishop against King and Bishop where Bishops
-;;                                  are on the same colored squares
-;;                                  (I will not implement this)
+
 ;;      - The fifty move rule: There has been no capture in the last fifty moves
 ;;                             by either player
 ;;      - Threefold repetition: The same board position has occurred three times
@@ -1079,7 +1067,14 @@
 
 (defn play
   ;;Plays chess!
-  [FEN]
+  ([]
+   (do (println "\nWelcome to chess! Let's watch the computer play itself!
+                 \n\nBlack will be choosing moves randomly but white has been imbued
+                 \nwith some AI smarts. Let's see who wins!
+                 \n\nRemember that White is upper case and black is lower case.
+                 \nHere we go!\n\n")
+          (play FEN)))
+  ([FEN]
   (let [board (board-from-FEN FEN)
         player (get-player FEN)]
     (do (print-player player)
@@ -1090,20 +1085,24 @@
      
      (is-stalemate board player) (do (prn "Stalemate!"))
 
-     (insufficient-material board player) (do (prn "Draw by insufficient material!"))
-
      (fifty-move-rule FEN) (do (prn "Draw! Fifty move rule hit!"))
 
-     :else (let [scored-moves (score-moves (possible-moves board player) board player)
-                 selected-move (select-best-move scored-moves)
+     :else (let [scored-moves (if (is-white player)
+                                (score-moves (possible-moves board player) board player)
+                                (possible-moves board player))
+                 selected-move (if (is-white player)
+                                 (select-best-move scored-moves)
+                                 (select-random-move scored-moves))
                  move-result (make-move selected-move board)
                  new-board (get move-result :new-board)
                  captures (get move-result :captures)
                  FEN-with-board (FENify-board new-board FEN)
-                 FEN-with-player (change-player FEN-with-board)]
-             (recur FEN-with-player)))))
-
-;;Write a move shuffling function
+                 FEN-with-player (change-player FEN-with-board)
+                 FEN-with-clock (if (empty? captures)
+                                  (FEN-with-player)
+                                  (increment-clock FEN-with-player :half-move-clock ))
+                 new-FEN FEN-with-clock]
+             (recur new-FEN))))))
 
 ;; Left:
 ;;    -Insufficient material
