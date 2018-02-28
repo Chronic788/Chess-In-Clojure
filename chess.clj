@@ -4,10 +4,11 @@
 (def max-int 9999999999)
 (def min-int -9999999999)
 
-(def search-depth 10)
+(def search-depth 3)
 
-;;Define the starting position
+;;Starting position
 (def FEN "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1")
+;;(def FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
 (def FEN-indeces {:board 0
                   :player 1
@@ -121,6 +122,12 @@
 ;; ({tuple 1}, {tuple 2}, {tuple 3})
 ;;------------------------------------------------------------------------------------------
 
+(defn print-player
+  ;;Prints the current player
+  [color]
+  (if (is-white color)
+    (println "White's turn...")
+    (println "Black's turn...")))
 
 (defn print-piece
   ;;Pretty prints the contents of a piece
@@ -787,12 +794,29 @@
          (recur (rest available-moves) board color moves-out-of-check)))
      moves-out-of-check)))
 
+(defn shuffle-moves
+  ;;Randomly shuffles the given list of moves
+  ([moves]
+   (shuffle-moves moves '()))
+  ([moves shuffled]
+   (if (not-empty moves)
+     (let [random-index (rand-int (count moves))
+           precedent (take random-index moves)
+           move (nth moves random-index)
+           antecedent (nthrest moves (+ 1 random-index))]
+       (recur (concat precedent antecedent) (conj shuffled move)))
+     shuffled)))
+
 (defn possible-moves
   ;;Returns the appropriate list of available moves based on check
+  ;;This function also shuffles moves before returning them to increase variability
+  ;;in score-static play. In beginning and mid games most moves score about the same
+  ;;so doing this makes for a more organic game. If shuffling were not implemented,
+  ;;the algorithm would just choose the leftmost move in the list of possible moves.
   [board player]
-  (if (in-check board player)
-    (available-moves-out-of-check board player)
-    (all-available-moves board player)))
+   (if (in-check board player)
+     (shuffle-moves (available-moves-out-of-check board player))
+     (shuffle-moves (all-available-moves board player))))
 
 (defn all-move-destinations
   ;;Collects all of the landing spaces for the given list of moves
@@ -993,12 +1017,8 @@
         max-int
         (score-board board color))
       (if maximizing
-        (do ;;(prn "Maximizing")
-            (maximize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta min-int))
-        (do ;;(prn "MiniMizing")
-            (minimize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta max-int)
-)
-        ))))
+        (maximize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta min-int)
+        (minimize (generate-board-states (possible-moves board color) board) color depth maximizing alpha beta max-int)))))
 
 (defn score-moves
   ;;Assigns scores to each move in the list passed into it
@@ -1017,13 +1037,12 @@
   ([moves best-move]
    (if (not-empty moves)
      (let [move (first moves)
-         move-score (get move :score)
-         best-score (get best-move :score)]
+           move-score (get move :score)
+           best-score (get best-move :score)]
        (if (> move-score best-score)
          (recur (rest moves) move)
          (recur (rest moves) best-move)))
-     best-move))
-  )
+     best-move)))
 
 (defn select-random-move
   ;;Selects a random move from the list of given moves
@@ -1061,10 +1080,10 @@
 (defn play
   ;;Plays chess!
   [FEN]
-  ;;(Thread/sleep 2000)
   (let [board (board-from-FEN FEN)
         player (get-player FEN)]
-    (do (print-board-FEN FEN))
+    (do (print-player player)
+        (print-board-FEN FEN))
     (cond 
      (is-checkmate board player) (do (prn "Checkmate!")
                                      (prn (str (opposite-color player) " wins!")))
@@ -1082,16 +1101,12 @@
                  captures (get move-result :captures)
                  FEN-with-board (FENify-board new-board FEN)
                  FEN-with-player (change-player FEN-with-board)]
-
              (recur FEN-with-player)))))
 
+;;Write a move shuffling function
 
-;;Left:
-
+;; Left:
 ;;    -Insufficient material
 ;;    -May not move into check - Filter in valid moves
 ;;    -Castling Moves - Add to king
-;;    -Finish scoring
-;;    -Alpha Beta Minimax
-;;    -Random Moving
 ;;    -API with Chess.js
