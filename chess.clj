@@ -975,8 +975,8 @@
      (* 5 (if (in-check board (opposite-color color))
             1
             0))
-     (* 0.1 (count (all-available-moves board color)))
-     (* 0.25 (center-control-score board color))))
+     (* 0.15 (count (all-available-moves board color)))
+     (* 0.5 (center-control-score board color))))
 
 (defn maximize
   ;;Performs the maximizing function of the mini max function
