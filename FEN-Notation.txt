@@ -54,7 +54,6 @@ Algebraic Notation
 
 Files are alphabetic.
 Ranks are numberic.
-
           a b c d e f g h
         8
         7
