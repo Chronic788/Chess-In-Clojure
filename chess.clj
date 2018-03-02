@@ -1,15 +1,17 @@
 
 (require '[clojure.string :as str])
 
+;;Constants to represent Infinity in both directions
 (def max-int 9999999999)
 (def min-int -9999999999)
 
+;;The level to which AB Mini Max searches
 (def search-depth 5)
 
-;;Starting position
+;;FEN Starting position
 (def FEN "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1")
-;;(def FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 
+;;A map mapping the name of a position to its index in the FEN String
 (def FEN-indeces {:board 0
                   :player 1
                   :castling 2
@@ -37,6 +39,7 @@
   (str/lower-case (str c)))
 
 (defn lower-case?
+  ;;Determines whether a given Character is lower-case
   [c]
   (let [ascii (int c)]
     (if (or (< ascii 97) (> ascii 122))
@@ -44,6 +47,7 @@
       true)))
 
 (defn upper-case?
+  ;;Determines if the given character is upper-case
   [c]
   (not (lower-case? c)))
 
@@ -67,6 +71,7 @@
     (str (nth alphas (dec file)) rank)))
 
 (defn dot
+  ;;Determines if the given character is a period symbol
   [c]
   (characters-equal? c \.))
 
@@ -130,7 +135,7 @@
     (println "Black's turn...")))
 
 (defn print-piece
-  ;;Pretty prints the contents of a piece
+  ;;Pretty prints the contents of a piece for debugging purposes
   [piece]
   (let [coordinates (get piece :coordinates)
         p (get piece :piece)
@@ -164,6 +169,7 @@
     (println)))
 
 (defn process-rank
+  ;;Assimilates the attributes of a given Rank on the board into Piece maps
   [rank rankNumber file board]
   (let [piece (first rank)
         entry (assoc {} 
@@ -176,6 +182,7 @@
       (conj board entry))))
 
 (defn compose-board
+  ;;Assimilates the attributes of the set of ranks on the board into a single set of Piece maps
   [ranks rankNumber board]
   (let [rank (first ranks) file 1]
     (if (not-empty (rest ranks))
@@ -251,7 +258,7 @@
         conseq))))
 
 (defn get-blank-pieces-from-rank
-  ;;Returns the given blank pieces from the given rank
+  ;;Returns any blank pieces from the given rank
   [rank]
   (filter (fn [piece] (characters-equal? \. (get piece :piece))) rank))
 
@@ -303,7 +310,7 @@
   (str/join " " (assoc (vector-FEN FEN) (get FEN-indeces component) value)))
 
 (defn FENify-board
-  ;;Assimilates the board component of the FEN string into the given FEN
+  ;;Assimilates the board component of the FEN string into the given FEN String
   [board FEN]
   (replace-in-FEN FEN :board (FENify-ranks board)))
 
@@ -411,20 +418,20 @@
 ;;------------------------------------------------------------------------------------------
 
 (defn change-player
-  ;;Change's whose turn it is in the FEN string
+  ;;Change's whose turn it is in the FEN string by returning a new FEN string with the player flipped
   [FEN]
   (if (characters-equal? \w (first (get-player FEN)))
     (replace-in-FEN FEN :player "b")
     (replace-in-FEN FEN :player "w")))
 
 (defn increment-clock
-  ;;Increments the half clock indicator on the FEN string, the 4th Entry
+  ;;Increments the half clock indicator on the FEN string, the 4th Entry by returning a new FEN String
   [FEN which-clock]
   (let [clock (get-from-FEN FEN which-clock)]
     (replace-in-FEN FEN which-clock (inc (toInt clock)))))
 
 (defn reset-halfmove-clock
-  ;;Resets the halfmove clock to 0
+  ;;Resets the halfmove clock to 0 by returning a new FEN String
   [FEN]
   (replace-in-FEN FEN :half-move-clock 0))
 
@@ -433,9 +440,11 @@
 ;;------------------------------------------------------------------------------------------
 
 (def test-piece
+  ;;A piece to test the program with
   (first (board-from-FEN FEN)))
 
 (def test-board
+  ;;A board to test the functions of the program with
   (board-from-FEN FEN))
 
 (defn out-of-bounds
@@ -574,6 +583,7 @@
 ;;King
 
 (defn king-moves
+  ;;Defines a list of moves for that a king can make
   [king]
   (map define-move [[king 1 1] 
                     [king 1 0]
@@ -588,6 +598,7 @@
 ;;Knights
 
 (defn knight-moves
+  ;;Defines a list of moves that a knight can make
   [knight]
   (map define-move [[knight -1 2]
                     [knight -2 1]
@@ -621,7 +632,7 @@
 ;;          3. If the piece lands on a piece of the opposite color, recursion will stop WITH adding
 ;;             that piece to the move accumulator.
 ;;
-;;         Pieces that tile are the Queen, the castles, and the bishops
+;;         Pieces that tile are the queens, the castles, and the bishops
 ;;
 ;;----------------------------------------------------------
 
