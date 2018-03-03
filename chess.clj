@@ -1115,6 +1115,9 @@
                  new-FEN FEN-with-clock]
              (recur new-FEN))))))
 
+(play)
+
+
 ;; Left:
 ;;    -Insufficient material
 ;;    -May not move into check - Filter in valid moves
