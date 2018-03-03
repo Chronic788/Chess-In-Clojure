@@ -2,7 +2,7 @@
 
 In an effort to dive into the exciting world of functional programming, I chose to write an Artificially Intelligent chess playing program in Clojure. The primary objective was to learn the language, so I left out some of the fancier features such as a fancy graphical representation of the board, keeping track of the score, showing which pieces were taken, and other such items which you might see in a polished product. You can follow along with the game as the board is printed in text to watch gameplay. 
 
-##Notes on Method and Experience
+## Notes on Method and Experience
 
 I also chose to focus on syntax and functionality in my learning so I neglected to break out code into separate files and organize it in any such manner. In short, the source is a single file which is sectioned off through comments to chunk the many functions in coherent groups. Flailing about to honor engineering principals such as logic segregation, project organization, and namespace considerations seemed excessive for my first run at a substantive program in a new language. It is my view that we programmers are so conditioned to avert the horror of frighteningly disorganized projects that we over tax ourselves when we attempt to learn new things. The understanding of the Right and Proper method of doing things should follow out of the methodically applied layers of learning that starts from the bottom up.
 
